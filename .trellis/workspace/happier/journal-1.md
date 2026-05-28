@@ -99,3 +99,39 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: 应用内更新功能与版本管理
+
+**Date**: 2026-05-28
+**Task**: 应用内更新功能与版本管理
+**Branch**: `main`
+
+### Summary
+
+完成应用内更新功能：1) 实现从GitHub Releases下载APK并自动安装；2) 优化版本号管理，从package_info_plus读取版本号；3) 发布v0.0.2版本。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5fe3e71` | (see git log) |
+| `b3d1988` | (see git log) |
+| `0a0cd3e` | (see git log) |
+| `359b853` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
