@@ -77,55 +77,11 @@ class SongDetailSheet extends StatefulWidget {
 
 class _SongDetailSheetState extends State<SongDetailSheet> {
   final PlaylistsService _playlists = PlaylistsService.instance;
-  bool _isFavorite = false;
-  bool _loadingFavorite = true;
   bool _downloading = false;
-  String _favoriteName = PlaylistsService.favoritePlaylistName;
 
   @override
   void initState() {
     super.initState();
-    _loadFavoriteState();
-  }
-
-  Future<void> _loadFavoriteState() async {
-    final songId = widget.song.id;
-    final list = await _playlists.loadAll();
-    PlaylistEntity? favorite;
-    for (final p in list) {
-      if (p.isFavorite || p.id == PlaylistsService.favoritePlaylistId) {
-        favorite = p;
-        break;
-      }
-    }
-    final next = favorite?.songIds.contains(songId) ?? false;
-    final name = (favorite?.name ?? '').trim();
-    if (!mounted) return;
-    setState(() {
-      _isFavorite = next;
-      _loadingFavorite = false;
-      if (name.isNotEmpty) {
-        _favoriteName = name;
-      }
-    });
-  }
-
-  Future<void> _toggleFavorite() async {
-    if (_loadingFavorite) return;
-    final songId = widget.song.id;
-    if (_isFavorite) {
-      await _playlists.removeSongs(PlaylistsService.favoritePlaylistId, [
-        songId,
-      ]);
-      if (!mounted) return;
-      setState(() => _isFavorite = false);
-      AppToast.show(context, '已从$_favoriteName移出');
-    } else {
-      await _playlists.addSongs(PlaylistsService.favoritePlaylistId, [songId]);
-      if (!mounted) return;
-      setState(() => _isFavorite = true);
-      AppToast.show(context, '已添加到$_favoriteName');
-    }
   }
 
   Future<void> _downloadToSystemFolder() async {
@@ -230,15 +186,6 @@ class _SongDetailSheetState extends State<SongDetailSheet> {
                         ),
                       ],
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      _isFavorite
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_border_rounded,
-                      color: _isFavorite ? theme.colorScheme.error : null,
-                    ),
-                    onPressed: _loadingFavorite ? null : _toggleFavorite,
                   ),
                 ],
               ),

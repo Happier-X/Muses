@@ -862,9 +862,7 @@ class _HomeRecentPlaylistsList extends StatelessWidget {
     }
     return Column(
       children: playlists.map((playlist) {
-        final subtitle = playlist.isFavorite
-            ? '我喜欢 · ${playlist.songIds.length} 首'
-            : '${playlist.songIds.length} 首';
+        final subtitle = '${playlist.songIds.length} 首';
         return AppListTile(
           leading: Container(
             width: 44,
@@ -884,9 +882,7 @@ class _HomeRecentPlaylistsList extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Icon(
-              playlist.isFavorite
-                  ? Icons.favorite_rounded
-                  : Icons.queue_music_rounded,
+              Icons.queue_music_rounded,
               color: Theme.of(context).colorScheme.primary,
             ),
           ),

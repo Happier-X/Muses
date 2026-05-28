@@ -88,25 +88,6 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   );
                 },
               ),
-              ValueListenableBuilder<bool>(
-                valueListenable: MediaNotificationSettings.showFavoriteAction,
-                builder: (context, enabled, _) {
-                  return AppSettingSwitchTile(
-                    title: '显示收藏按钮',
-                    subtitle: _supportsCustomActions
-                        ? '在通知上展示收藏/取消收藏'
-                        : '当前设备暂不可用自定义通知按钮',
-                    value: _supportsCustomActions && enabled,
-                    onChanged: _supportsCustomActions
-                        ? (value) {
-                            MediaNotificationSettings.setShowFavoriteAction(
-                              value,
-                            );
-                          }
-                        : null,
-                  );
-                },
-              ),
             ],
           ),
         ],

@@ -69,10 +69,8 @@ class _NagoAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   final PlayerService player;
   static const String _actionCloseApp = 'close_app';
-  static const String _actionFavorite = 'favorite';
   String? _currentLyricLine;
   String? _lastSongId;
-  bool _isFavorite = false;
   String? _lastQueueKey;
   String? _lastMediaItemKey;
   String? _lastPlaybackStateKey;
@@ -88,9 +86,6 @@ class _NagoAudioHandler extends BaseAudioHandler
       _onNotificationSettingsChanged,
     );
     MediaNotificationSettings.showCloseAction.addListener(
-      _onNotificationSettingsChanged,
-    );
-    MediaNotificationSettings.showFavoriteAction.addListener(
       _onNotificationSettingsChanged,
     );
     _currentLyricLine = LyricsService.instance.currentLineText.value;
@@ -158,12 +153,6 @@ class _NagoAudioHandler extends BaseAudioHandler
     final showClose =
         _supportsCustomActions &&
         MediaNotificationSettings.showCloseAction.value;
-    final showFavorite =
-        _supportsCustomActions &&
-        MediaNotificationSettings.showFavoriteAction.value;
-    final favoriteIcon = _isFavorite
-        ? 'drawable/audio_service_favorite_on'
-        : 'drawable/audio_service_favorite';
     final controls = <MediaControl>[
       MediaControl.skipToPrevious,
       playing ? MediaControl.pause : MediaControl.play,
@@ -175,15 +164,6 @@ class _NagoAudioHandler extends BaseAudioHandler
           name: _actionCloseApp,
           androidIcon: 'drawable/audio_service_close',
           label: '关闭',
-        ),
-      );
-    }
-    if (showFavorite) {
-      controls.add(
-        MediaControl.custom(
-          name: _actionFavorite,
-          androidIcon: favoriteIcon,
-          label: _isFavorite ? '已收藏' : '收藏',
         ),
       );
     }
@@ -206,7 +186,6 @@ class _NagoAudioHandler extends BaseAudioHandler
   void _syncFromPlayer() {
     final snap = player.snapshot.value;
     final songId = snap.song?.id;
-    final songChanged = songId != _lastSongId;
     if (songId != _lastSongId) {
       _lastSongId = songId;
       _currentLyricLine = null;
@@ -215,9 +194,6 @@ class _NagoAudioHandler extends BaseAudioHandler
     _syncQueue(snap);
     _syncMediaItem();
     _syncPlaybackState(snap);
-    if (songChanged) {
-      _refreshFavoriteState();
-    }
   }
 
   void _syncQueue(PlaybackSnapshot snap) {
@@ -255,11 +231,9 @@ class _NagoAudioHandler extends BaseAudioHandler
       snap.position.inMilliseconds,
       snap.bufferedPosition.inMilliseconds,
       snap.duration?.inMilliseconds ?? -1,
-      _isFavorite,
       MediaNotificationSettings.showLyrics.value,
       MediaNotificationSettings.lyricOnTop.value,
       MediaNotificationSettings.showCloseAction.value,
-      MediaNotificationSettings.showFavoriteAction.value,
       _supportsCustomActions,
     ].join('|');
     if (stateKey == _lastPlaybackStateKey) return;
@@ -279,25 +253,6 @@ class _NagoAudioHandler extends BaseAudioHandler
       _currentLyricLine = LyricsService.instance.currentLineText.value;
     }
     _syncMediaItem();
-    playbackState.add(_stateFromSnap(player.snapshot.value));
-  }
-
-  void _refreshFavoriteState() {
-    () async {
-      final song = player.snapshot.value.song;
-      if (song == null) {
-        _updateFavorite(false);
-        return;
-      }
-      final isFav = await PlaylistsService.instance.isSongFavorited(song.id);
-      _updateFavorite(isFav);
-    }();
-  }
-
-  void _updateFavorite(bool value) {
-    if (_isFavorite == value) return;
-    _isFavorite = value;
-    _debugLog('favorite state changed: $_isFavorite');
     playbackState.add(_stateFromSnap(player.snapshot.value));
   }
 
@@ -328,31 +283,12 @@ class _NagoAudioHandler extends BaseAudioHandler
   @override
   Future<void> customAction(String name, [Map<String, dynamic>? extras]) async {
     _debugLog('customAction name=$name');
-    if (name != _actionCloseApp) {
-      if (name != _actionFavorite) {
-        return super.customAction(name, extras);
-      }
-      final song = player.snapshot.value.song;
-      if (song == null) return;
-      if (_isFavorite) {
-        _debugLog('favorite remove action song=${song.title}');
-        await PlaylistsService.instance.removeSongs(
-          PlaylistsService.favoritePlaylistId,
-          [song.id],
-        );
-        _updateFavorite(false);
-      } else {
-        _debugLog('favorite add action song=${song.title}');
-        await PlaylistsService.instance.addSongs(
-          PlaylistsService.favoritePlaylistId,
-          [song.id],
-        );
-        _updateFavorite(true);
-      }
+    if (name == _actionCloseApp) {
+      _debugLog('close action');
+      await stop();
       return;
     }
-    _debugLog('close action');
-    await stop();
+    return super.customAction(name, extras);
   }
 
   @override

@@ -106,8 +106,7 @@ class _PlaylistsPageState extends State<PlaylistsPage>
       return;
     }
 
-    final favorite = playlists.where((p) => p.isFavorite).toList();
-    final others = playlists.where((p) => !p.isFavorite).toList();
+    final sorted = playlists.toList();
 
     int compare(PlaylistEntity a, PlaylistEntity b) {
       switch (_sortMode.value) {
@@ -121,12 +120,12 @@ class _PlaylistsPageState extends State<PlaylistsPage>
       }
     }
 
-    others.sort(compare);
+    sorted.sort(compare);
     if (!_ascending.value) {
-      others.replaceRange(0, others.length, others.reversed);
+      sorted.replaceRange(0, sorted.length, sorted.reversed);
     }
 
-    _playlists.value = [...favorite, ...others];
+    _playlists.value = sorted;
   }
 
   Future<void> _createPlaylist() async {
@@ -189,15 +188,14 @@ class _PlaylistsPageState extends State<PlaylistsPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (!playlist.isFavorite)
-                AppListTile(
-                  leading: const Icon(Icons.vertical_align_top_rounded),
-                  title: '置顶',
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _pinPlaylist(playlist);
-                  },
-                ),
+              AppListTile(
+                leading: const Icon(Icons.vertical_align_top_rounded),
+                title: '置顶',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pinPlaylist(playlist);
+                },
+              ),
               AppListTile(
                 leading: const Icon(Icons.edit_rounded),
                 title: '重命名',
@@ -206,19 +204,18 @@ class _PlaylistsPageState extends State<PlaylistsPage>
                   _renamePlaylist(playlist);
                 },
               ),
-              if (!playlist.isFavorite)
-                AppListTile(
-                  leading: const Icon(
-                    Icons.delete_outline_rounded,
-                    color: Colors.red,
-                  ),
-                  title: '删除',
-                  titleColor: Colors.red,
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _deletePlaylist(playlist);
-                  },
+              AppListTile(
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.red,
                 ),
+                title: '删除',
+                titleColor: Colors.red,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _deletePlaylist(playlist);
+                },
+              ),
               const SizedBox(height: 12),
             ],
           ),
@@ -245,19 +242,13 @@ class _PlaylistsPageState extends State<PlaylistsPage>
     if (oldIndex < newIndex) newIndex -= 1;
     final list = _allPlaylists.toList();
     final item = list[oldIndex];
-    if (item.isFavorite) return;
     list.removeAt(oldIndex);
     list.insert(newIndex, item);
-    final favIndex = list.indexWhere((p) => p.isFavorite);
-    if (favIndex > 0) {
-      final fav = list.removeAt(favIndex);
-      list.insert(0, fav);
-    }
     _allPlaylists = list;
     _playlists.value = list;
-    await _service.reorderPlaylists(
-      list.where((p) => !p.isFavorite).map((p) => p.id).toList(),
-    );
+    await _service.reorderPlaylists(list.map((p) => p.id).toList());
+    if (!mounted) return;
+    await _load();
   }
 
   void _openDrawer() {
@@ -351,19 +342,12 @@ class _PlaylistsPageState extends State<PlaylistsPage>
                   onReorder: _reorderPlaylists,
                   itemBuilder: (context, index) {
                     final p = _playlists.value[index];
-                    final isFavorite = p.isFavorite;
-                    final canReorder =
-                        _sortMode.value == 'custom' && !isFavorite;
+                    final canReorder = _sortMode.value == 'custom';
                     return Column(
                       key: ValueKey(p.id),
                       children: [
                         ListTile(
-                          leading: Icon(
-                            isFavorite
-                                ? Icons.favorite
-                                : Icons.queue_music_rounded,
-                            color: isFavorite ? Colors.red : null,
-                          ),
+                          leading: const Icon(Icons.queue_music_rounded),
                           title: Text(
                             p.name,
                             maxLines: 1,
@@ -1107,12 +1091,7 @@ class _PlaylistPickerSheetState extends State<PlaylistPickerSheet>
                   else
                     ..._playlists.value.map(
                       (p) => ListTile(
-                        leading: Icon(
-                          p.isFavorite
-                              ? Icons.favorite
-                              : Icons.queue_music_rounded,
-                          color: p.isFavorite ? Colors.red : null,
-                        ),
+                        leading: const Icon(Icons.queue_music_rounded),
                         title: Text(
                           p.name,
                           maxLines: 1,
@@ -1177,14 +1156,10 @@ Future<bool> showAddToPlaylistDialog(
                     final playlist = playlists[index];
                     return AppListTile(
                       leading: Icon(
-                        playlist.isFavorite
-                            ? Icons.favorite
-                            : Icons.queue_music,
-                        color: playlist.isFavorite
-                            ? Colors.red
-                            : Theme.of(
-                                context,
-                              ).iconTheme.color?.withValues(alpha: 0.7),
+                        Icons.queue_music,
+                        color: Theme.of(
+                          context,
+                        ).iconTheme.color?.withValues(alpha: 0.7),
                       ),
                       title: playlist.name,
                       subtitle: '${playlist.songIds.length} 首',

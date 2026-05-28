@@ -279,9 +279,7 @@ class _RecentPlaybackPageState extends State<RecentPlaybackPage> {
         return _RecentPanel(
           child: Column(
             children: _playlists.map((row) {
-              final subtitle = row.playlist.isFavorite
-                  ? '我喜欢 · ${row.playlist.songIds.length} 首 · 播放 ${row.stat.playCount} 次'
-                  : '${row.playlist.songIds.length} 首 · 播放 ${row.stat.playCount} 次';
+              final subtitle = '${row.playlist.songIds.length} 首 · 播放 ${row.stat.playCount} 次';
               return AppListTile(
                 leading: Container(
                   width: 46,
@@ -292,9 +290,7 @@ class _RecentPlaybackPageState extends State<RecentPlaybackPage> {
                   ),
                   alignment: Alignment.center,
                   child: Icon(
-                    row.playlist.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.queue_music_rounded,
+                    Icons.queue_music_rounded,
                     color: theme.colorScheme.primary,
                   ),
                 ),
