@@ -101,7 +101,7 @@ class MainActivity : AudioServiceActivity() {
                     val sourcePath = call.argument<String>("sourcePath")
                     val fileName = call.argument<String>("fileName")
                     val mimeType = call.argument<String>("mimeType") ?: "audio/mpeg"
-                    val subdirectory = call.argument<String>("subdirectory") ?: "NagoMusic"
+                    val subdirectory = call.argument<String>("subdirectory") ?: "Muses"
                     if (sourcePath.isNullOrBlank() || fileName.isNullOrBlank()) {
                         result.error("invalid_args", "缺少文件信息", null)
                     } else {

@@ -56,7 +56,7 @@ class SongDownloadService {
         'sourcePath': source.path,
         'fileName': fileName,
         'mimeType': _mimeTypeFor(fileName),
-        'subdirectory': 'NagoMusic',
+        'subdirectory': 'Muses',
       });
       if (savedPath == null || savedPath.trim().isEmpty) {
         return const SongDownloadResult(success: false, message: '保存失败');
