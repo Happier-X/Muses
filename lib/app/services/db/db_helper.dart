@@ -66,7 +66,6 @@ CREATE TABLE ${DbConstants.tablePlaylists} (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   createdAtMs INTEGER NOT NULL,
-  isFavorite INTEGER NOT NULL,
   sortOrder INTEGER NOT NULL
 )
 ''');
@@ -174,7 +173,6 @@ CREATE TABLE IF NOT EXISTS ${DbConstants.tablePlaylists} (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   createdAtMs INTEGER NOT NULL,
-  isFavorite INTEGER NOT NULL,
   sortOrder INTEGER NOT NULL
 )
 ''');
@@ -239,6 +237,22 @@ CREATE TABLE IF NOT EXISTS ${DbConstants.tablePlaylistStats} (
           await db.execute(
             'CREATE INDEX IF NOT EXISTS idx_playlist_stats_playcount ON ${DbConstants.tablePlaylistStats}(playCount)',
           );
+        }
+        if (oldVersion < 10) {
+          await db.execute('''
+CREATE TABLE ${DbConstants.tablePlaylists}_new (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  createdAtMs INTEGER NOT NULL,
+  sortOrder INTEGER NOT NULL
+)
+''');
+          await db.execute('''
+INSERT INTO ${DbConstants.tablePlaylists}_new (id, name, createdAtMs, sortOrder)
+SELECT id, name, createdAtMs, sortOrder FROM ${DbConstants.tablePlaylists}
+''');
+          await db.execute('DROP TABLE ${DbConstants.tablePlaylists}');
+          await db.execute('ALTER TABLE ${DbConstants.tablePlaylists}_new RENAME TO ${DbConstants.tablePlaylists}');
         }
       },
     );
