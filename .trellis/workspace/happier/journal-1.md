@@ -60,3 +60,42 @@
 3. 测试应用在设备上的运行情况
 4. 根据需要调整应用图标和启动画面
 
+
+
+## Session 1: Muses应用改造与功能移除
+
+**Date**: 2026-05-28
+**Task**: Muses应用改造与功能移除
+**Branch**: `main`
+
+### Summary
+
+完成Muses应用改造：1) 将NagoMusic更名为Muses，更新所有相关配置；2) 配置GitHub Actions自动发版流程；3) 彻底移除我喜欢功能，包括数据库迁移；4) 解决Gradle依赖问题，移除阿里云镜像。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1f20b70` | (see git log) |
+| `4a65ac5` | (see git log) |
+| `c3980b9` | (see git log) |
+| `f78d28f` | (see git log) |
+| `bcae326` | (see git log) |
+| `4dea6b9` | (see git log) |
+| `4d12d74` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
