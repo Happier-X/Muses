@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:open_file/open_file.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/services/app_update_service.dart';
 import '../../app/services/debug_log_service.dart';
@@ -21,11 +22,11 @@ class VersionInfoPage extends StatefulWidget {
 
 class _VersionInfoPageState extends State<VersionInfoPage> {
   static const String _appName = 'Muses';
-  static const String _version = '0.0.1';
   static const String _iconAsset = '开发文档/NagoAPP图标.png';
 
   final DebugLogService _debugLogs = DebugLogService.instance;
 
+  String _version = '';
   bool _checking = false;
   bool _downloading = false;
   double _downloadProgress = 0;
@@ -36,6 +37,16 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
   void initState() {
     super.initState();
     _debugLogs.ensureLoaded();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = packageInfo.version;
+      });
+    }
   }
 
   Future<void> _checkUpdate() async {
