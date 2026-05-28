@@ -21,7 +21,7 @@ class VersionInfoPage extends StatefulWidget {
 
 class _VersionInfoPageState extends State<VersionInfoPage> {
   static const String _appName = 'Muses';
-  static const String _version = '0.0.1+1';
+  static const String _version = '0.0.1';
   static const String _iconAsset = '开发文档/NagoAPP图标.png';
 
   final DebugLogService _debugLogs = DebugLogService.instance;
