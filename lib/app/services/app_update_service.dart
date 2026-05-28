@@ -1,16 +1,20 @@
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class AppUpdateInfo {
   final String latestVersion;
   final String? releaseName;
   final String? releaseUrl;
   final bool hasUpdate;
+  final String? apkDownloadUrl;
 
   const AppUpdateInfo({
     required this.latestVersion,
     required this.hasUpdate,
     this.releaseName,
     this.releaseUrl,
+    this.apkDownloadUrl,
   });
 }
 
@@ -38,12 +42,44 @@ class AppUpdateService {
     final name = (data['name'] as String?)?.trim();
     final url = (data['html_url'] as String?)?.trim();
     final latest = tag.isEmpty ? currentVersion : _normalizeVersion(tag);
+    
+    // 查找APK下载链接
+    String? apkUrl;
+    final assets = data['assets'] as List?;
+    if (assets != null) {
+      for (final asset in assets) {
+        final assetName = (asset['name'] as String? ?? '').trim();
+        if (assetName.contains('arm64-v8a') && assetName.endsWith('.apk')) {
+          apkUrl = (asset['browser_download_url'] as String?)?.trim();
+          break;
+        }
+      }
+    }
+    
     return AppUpdateInfo(
       latestVersion: latest,
       releaseName: name == null || name.isEmpty ? null : name,
       releaseUrl: url == null || url.isEmpty ? releasePageUrl : url,
       hasUpdate: _compareVersions(latest, currentVersion) > 0,
+      apkDownloadUrl: apkUrl,
     );
+  }
+
+  Future<String> downloadApk(
+    String url,
+    String fileName, {
+    Function(int received, int total)? onProgress,
+    CancelToken? cancelToken,
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final filePath = '${dir.path}/$fileName';
+    await _dio.download(
+      url,
+      filePath,
+      onReceiveProgress: onProgress,
+      cancelToken: cancelToken,
+    );
+    return filePath;
   }
 
   String _normalizeVersion(String version) {

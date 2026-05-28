@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:dio/dio.dart';
+import 'package:open_file/open_file.dart';
 
 import '../../app/services/app_update_service.dart';
 import '../../app/services/debug_log_service.dart';
@@ -25,7 +27,10 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
   final DebugLogService _debugLogs = DebugLogService.instance;
 
   bool _checking = false;
+  bool _downloading = false;
+  double _downloadProgress = 0;
   AppUpdateInfo? _updateInfo;
+  CancelToken? _cancelToken;
 
   @override
   void initState() {
@@ -89,14 +94,82 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
               FilledButton(
                 onPressed: () {
                   Navigator.pop(context);
-                  _openUrl(info.releaseUrl ?? AppUpdateService.releasePageUrl);
+                  if (info.apkDownloadUrl != null) {
+                    _downloadAndInstall(info);
+                  } else {
+                    _openUrl(info.releaseUrl ?? AppUpdateService.releasePageUrl);
+                  }
                 },
-                child: const Text('前往下载'),
+                child: Text(info.apkDownloadUrl != null ? '下载更新' : '前往下载'),
               ),
           ],
         );
       },
     );
+  }
+
+  Future<void> _downloadAndInstall(AppUpdateInfo info) async {
+    if (_downloading) return;
+    
+    final apkUrl = info.apkDownloadUrl;
+    if (apkUrl == null) {
+      _openUrl(info.releaseUrl ?? AppUpdateService.releasePageUrl);
+      return;
+    }
+
+    setState(() {
+      _downloading = true;
+      _downloadProgress = 0;
+    });
+
+    _cancelToken = CancelToken();
+
+    try {
+      final fileName = 'muses-v${info.latestVersion}-arm64-v8a.apk';
+      final filePath = await AppUpdateService.instance.downloadApk(
+        apkUrl,
+        fileName,
+        onProgress: (received, total) {
+          if (total > 0 && mounted) {
+            setState(() {
+              _downloadProgress = received / total;
+            });
+          }
+        },
+        cancelToken: _cancelToken,
+      );
+
+      if (!mounted) return;
+      setState(() => _downloading = false);
+      
+      // 打开APK文件进行安装
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        if (!mounted) return;
+        AppToast.show(context, '无法打开安装包', type: ToastType.error);
+      }
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.cancel) {
+        if (!mounted) return;
+        AppToast.show(context, '下载已取消');
+      } else {
+        if (!mounted) return;
+        AppToast.show(context, '下载失败: ${e.message}', type: ToastType.error);
+      }
+      if (mounted) {
+        setState(() => _downloading = false);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.show(context, '下载失败: $e', type: ToastType.error);
+      if (mounted) {
+        setState(() => _downloading = false);
+      }
+    }
+  }
+
+  void _cancelDownload() {
+    _cancelToken?.cancel('用户取消');
   }
 
   Future<void> _showUpdateFailedDialog() async {
@@ -235,9 +308,28 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.chevron_right_rounded),
-                onTap: _checking ? null : _checkUpdate,
+                    : _downloading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              value: _downloadProgress > 0 ? _downloadProgress : null,
+                            ),
+                          )
+                        : const Icon(Icons.chevron_right_rounded),
+                onTap: _checking || _downloading ? null : _checkUpdate,
               ),
+              if (_downloading)
+                AppSettingTile(
+                  title: '下载中...',
+                  subtitle: '${(_downloadProgress * 100).toStringAsFixed(1)}%',
+                  leading: const Icon(Icons.download_rounded),
+                  trailing: TextButton(
+                    onPressed: _cancelDownload,
+                    child: const Text('取消'),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
