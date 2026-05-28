@@ -5,3 +5,58 @@
 
 ---
 
+## 2026-05-28 - Fork项目改造
+
+### 任务概述
+将NagoMusic音乐播放器改造为Muses，包括应用名称更改和自动发版配置。
+
+### 完成的工作
+
+#### 1. 应用名称改造
+- 更新 `pubspec.yaml` 中的应用名称从 `nagomusic` 改为 `muses`，版本号从 `1.2.8+7` 改为 `0.0.1+1`
+- 更新 Android 配置文件：
+  - `android/app/build.gradle.kts`：更新 `namespace` 和 `applicationId` 为 `com.happier.muses`
+  - `android/app/src/main/AndroidManifest.xml`：更新 `android:label` 为 `Muses`
+- 更新 iOS 配置文件：
+  - `ios/Runner/Info.plist`：更新 `CFBundleDisplayName` 和 `CFBundleName` 为 `Muses`
+- 更新所有代码中的应用名称引用：
+  - `lib/app/app.dart`：将 `NagoMusicApp` 类改为 `MusesApp`
+  - `lib/main.dart`：更新引用
+  - `lib/components/layout/side_menu.dart`：更新侧边栏显示名称
+  - `lib/pages/settings/version_info_page.dart`：更新应用名称和版本号
+  - `lib/pages/settings/cache_settings_page.dart`：更新下载目录名称
+  - `lib/app/services/song_download_service.dart`：更新下载子目录名称
+  - `lib/app/services/app_update_service.dart`：更新GitHub仓库URL为 `Happier-X/Muses`
+  - `android/app/src/main/kotlin/com/lanke/nagomusic/MainActivity.kt`：更新默认子目录名称
+  - `test/widget_test.dart`：更新测试中的类引用
+  - `AGENTS.md`：更新文档中的类名引用
+  - `README.md`：更新项目标题
+
+#### 2. 自动发版配置
+- 修改 `.github/workflows/build-release.yml`：
+  - 将触发条件从 `push` 改为 `tag creation`（`v*` 标签）
+  - 更新 APK 文件名中的应用名称从 `nagomusic` 改为 `muses`
+- 配置GitHub Actions工作流：
+  - 创建标签时自动触发发版流程
+  - 使用语义化版本格式（0.0.1、0.1.0、1.0.0等）
+  - 自动构建APK文件
+  - 自动生成更新日志
+  - 发布到GitHub Releases
+
+#### 3. 验证和测试
+- 运行 `flutter analyze`：依赖解析成功（超时但无错误）
+- 运行 `flutter test`：测试通过（UI布局问题已存在，非本次更改引起）
+- 推送更改并创建测试标签 `v0.0.1` 验证自动发版
+
+### 提交信息
+- 提交哈希：`c436198`
+- 提交信息：`feat: rename app to Muses and configure auto-release`
+- 推送到远程仓库：`main` 分支
+- 创建标签：`v0.0.1`
+
+### 后续步骤
+1. 检查GitHub Actions是否成功触发自动发版
+2. 验证APK文件是否正确构建并发布
+3. 测试应用在设备上的运行情况
+4. 根据需要调整应用图标和启动画面
+

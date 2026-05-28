@@ -27,8 +27,7 @@
 - [x] 发布到GitHub Releases
 
 ### 功能增删
-- [ ] 了解用户想要增加的功能
-- [ ] 了解用户想要删除的功能
+- [x] 暂无功能增删需求（用户确认）
 
 ## Acceptance Criteria
 
