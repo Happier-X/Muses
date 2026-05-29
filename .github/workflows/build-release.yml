@@ -31,9 +31,10 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - run: |
-          mv build/app/outputs/flutter-apk/app-prod-arm64-v8a-release.apk muses-v${VERSION}-arm64-v8a.apk
-          mv build/app/outputs/flutter-apk/app-prod-armeabi-v7a-release.apk muses-v${VERSION}-armeabi-v7a.apk
-          mv build/app/outputs/flutter-apk/app-prod-x86_64-release.apk muses-v${VERSION}-x86_64.apk
+          ls -la build/app/outputs/flutter-apk
+          mv build/app/outputs/flutter-apk/*arm64-v8a*release.apk muses-v${VERSION}-arm64-v8a.apk
+          mv build/app/outputs/flutter-apk/*armeabi-v7a*release.apk muses-v${VERSION}-armeabi-v7a.apk
+          mv build/app/outputs/flutter-apk/*x86_64*release.apk muses-v${VERSION}-x86_64.apk
       - name: Extract changelog for current version
         run: |
           # Extract content between current version header and previous version header
