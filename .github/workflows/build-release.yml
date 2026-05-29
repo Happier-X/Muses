@@ -27,6 +27,15 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: flutter pub get
+      - name: Configure signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > ${{ github.workspace }}/release.keystore
+          cat > ${{ github.workspace }}/key.properties << EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=${{ github.workspace }}/release.keystore
+          EOF
       - run: flutter build apk --release --split-per-abi --flavor prod
       - run: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
