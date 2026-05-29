@@ -24,7 +24,7 @@ class _GradientSettingsPageState extends State<GradientSettingsPage>
   }
 
   Future<void> _load() async {
-    await PlayerBackgroundSettings.ensureLoaded();
+    // PlayerBackgroundSettings is already preloaded in main.dart
     if (!mounted) return;
     _saturation.value = PlayerBackgroundSettings.saturation.value;
     _hueShift.value = PlayerBackgroundSettings.hueShift.value;

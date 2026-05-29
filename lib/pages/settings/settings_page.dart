@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../app/router/app_router.dart';
 import '../../app/state/settings_state.dart';
 import '../../components/index.dart';
-import '../player/widgets/player_background.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -15,12 +14,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void initState() {
     super.initState();
-    PlayerBackgroundSettings.ensureLoaded();
-    PlayerBottomActionSettings.ensureLoaded();
-    WebDavPlaybackSettings.ensureLoaded();
-    MediaNotificationSettings.ensureLoaded();
-    AppLayoutSettings.ensureLoaded();
-    AppBackgroundSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
   }
 
   @override

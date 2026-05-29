@@ -162,7 +162,7 @@ class AppPageScaffoldState extends State<AppPageScaffold>
       );
     }
 
-    _publishMiniPlayer();
+    // moved to initState and didUpdateWidget
 
     final hasBottomNav = _hasBottomNav;
     final bottomBar = hasBottomNav

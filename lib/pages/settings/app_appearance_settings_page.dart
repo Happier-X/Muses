@@ -17,9 +17,7 @@ class _AppAppearanceSettingsPageState extends State<AppAppearanceSettingsPage> {
   @override
   void initState() {
     super.initState();
-    AppLayoutSettings.ensureLoaded();
-    AppThemeSettings.ensureLoaded();
-    AppBackgroundSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
   }
 
   String _themeLabel(ThemeMode mode) {

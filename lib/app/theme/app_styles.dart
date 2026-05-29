@@ -26,24 +26,76 @@ class CoverPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final slideAnimation = CurvedAnimation(
-      parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-    final offsetTween = Tween(begin: const Offset(0.08, 0), end: Offset.zero);
-    final content = SlideTransition(
-      position: slideAnimation.drive(offsetTween),
+    return _CoverPageTransition(
+      animation: animation,
+      secondaryAnimation: secondaryAnimation,
       child: child,
     );
-    if (secondaryAnimation.status != AnimationStatus.dismissed) {
-      final fadeOut = CurvedAnimation(
-        parent: secondaryAnimation,
-        curve: const Interval(0, 0.2),
-      );
-      return FadeTransition(opacity: ReverseAnimation(fadeOut), child: content);
-    }
-    return content;
+  }
+}
+
+class _CoverPageTransition extends StatefulWidget {
+  final Animation<double> animation;
+  final Animation<double> secondaryAnimation;
+  final Widget child;
+
+  const _CoverPageTransition({
+    required this.animation,
+    required this.secondaryAnimation,
+    required this.child,
+  });
+
+  @override
+  State<_CoverPageTransition> createState() => _CoverPageTransitionState();
+}
+
+class _CoverPageTransitionState extends State<_CoverPageTransition> {
+  late final CurvedAnimation _primaryAnimation;
+  late final CurvedAnimation _secondaryAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _primaryAnimation = CurvedAnimation(
+      parent: widget.animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeOutCubic,
+    );
+    _secondaryAnimation = CurvedAnimation(
+      parent: widget.secondaryAnimation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  void dispose() {
+    _primaryAnimation.dispose();
+    _secondaryAnimation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 当前页面：从右侧滑入（进入）或向右滑出（返回）
+    final primaryOffset = Tween<Offset>(
+      begin: const Offset(1.0, 0.0),
+      end: Offset.zero,
+    ).animate(_primaryAnimation);
+
+    // 前一页：向左滑出（进入）或从左侧滑入（返回）
+    final secondaryOffset = Tween<Offset>(
+      begin: Offset.zero,
+      end: const Offset(-0.3, 0.0),
+    ).animate(_secondaryAnimation);
+
+    return SlideTransition(
+      position: secondaryOffset,
+      child: SlideTransition(
+        position: primaryOffset,
+        child: widget.child,
+      ),
+    );
   }
 }
 

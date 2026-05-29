@@ -70,120 +70,110 @@ class MusesApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
-        return ValueListenableBuilder<ThemeMode>(
-          valueListenable: AppThemeSettings.themeMode,
-          builder: (context, mode, _) {
-            return ValueListenableBuilder<bool>(
-              valueListenable: AppThemeSettings.dynamicColorEnabled,
-              builder: (context, dynamicEnabled, _) {
-                return ValueListenableBuilder<Color?>(
-                  valueListenable: AppThemeSettings.themeSeedColor,
-                  builder: (context, seedColor, _) {
-                    final baseSeed = seedColor ?? const Color(0xFF3B82F6);
-                    final lightBase = ThemeData(
-                      colorScheme: ColorScheme.fromSeed(
-                        seedColor: baseSeed,
-                        brightness: Brightness.light,
-                      ),
-                      useMaterial3: true,
-                      pageTransitionsTheme: const PageTransitionsTheme(
-                        builders: {
-                          TargetPlatform.android: CoverPageTransitionsBuilder(),
-                          TargetPlatform.iOS: CoverPageTransitionsBuilder(),
-                          TargetPlatform.macOS: CoverPageTransitionsBuilder(),
-                          TargetPlatform.windows: CoverPageTransitionsBuilder(),
-                          TargetPlatform.linux: CoverPageTransitionsBuilder(),
-                        },
-                      ),
-                    );
-                    final darkBase = ThemeData(
-                      colorScheme: ColorScheme.fromSeed(
-                        seedColor: baseSeed,
-                        brightness: Brightness.dark,
-                      ),
-                      useMaterial3: true,
-                      pageTransitionsTheme: const PageTransitionsTheme(
-                        builders: {
-                          TargetPlatform.android: CoverPageTransitionsBuilder(),
-                          TargetPlatform.iOS: CoverPageTransitionsBuilder(),
-                          TargetPlatform.macOS: CoverPageTransitionsBuilder(),
-                          TargetPlatform.windows: CoverPageTransitionsBuilder(),
-                          TargetPlatform.linux: CoverPageTransitionsBuilder(),
-                        },
-                      ),
-                    );
-                    final lightTheme = _applyDynamic(
-                      lightBase,
-                      dynamicEnabled ? lightDynamic : null,
-                    );
-                    final darkTheme = _applyDynamic(
-                      darkBase,
-                      dynamicEnabled ? darkDynamic : null,
-                    );
-                    final routes = AppRouter.routes;
-                    Route<dynamic> onGenerateRoute(RouteSettings settings) {
-                      final name = settings.name ?? AppRoutes.songs;
-                      final target = routes[name] ?? routes[AppRoutes.songs]!;
-                      return buildAppPageRoute<dynamic>(
-                        target,
-                        settings: settings,
-                      );
-                    }
+        return AnimatedBuilder(
+          animation: Listenable.merge([
+            AppThemeSettings.themeMode,
+            AppThemeSettings.dynamicColorEnabled,
+            AppThemeSettings.themeSeedColor,
+          ]),
+          builder: (context, _) {
+            final mode = AppThemeSettings.themeMode.value;
+            final dynamicEnabled = AppThemeSettings.dynamicColorEnabled.value;
+            final seedColor = AppThemeSettings.themeSeedColor.value;
+            final baseSeed = seedColor ?? const Color(0xFF3B82F6);
+            final lightBase = ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: baseSeed,
+                brightness: Brightness.light,
+              ),
+              useMaterial3: true,
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: CoverPageTransitionsBuilder(),
+                  TargetPlatform.iOS: CoverPageTransitionsBuilder(),
+                  TargetPlatform.macOS: CoverPageTransitionsBuilder(),
+                  TargetPlatform.windows: CoverPageTransitionsBuilder(),
+                  TargetPlatform.linux: CoverPageTransitionsBuilder(),
+                },
+              ),
+            );
+            final darkBase = ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: baseSeed,
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: CoverPageTransitionsBuilder(),
+                  TargetPlatform.iOS: CoverPageTransitionsBuilder(),
+                  TargetPlatform.macOS: CoverPageTransitionsBuilder(),
+                  TargetPlatform.windows: CoverPageTransitionsBuilder(),
+                  TargetPlatform.linux: CoverPageTransitionsBuilder(),
+                },
+              ),
+            );
+            final lightTheme = _applyDynamic(
+              lightBase,
+              dynamicEnabled ? lightDynamic : null,
+            );
+            final darkTheme = _applyDynamic(
+              darkBase,
+              dynamicEnabled ? darkDynamic : null,
+            );
+            final routes = AppRouter.routes;
+            Route<dynamic> onGenerateRoute(RouteSettings settings) {
+              final name = settings.name ?? AppRoutes.songs;
+              final target = routes[name] ?? routes[AppRoutes.songs]!;
+              return buildAppPageRoute<dynamic>(
+                target,
+                settings: settings,
+              );
+            }
 
-                    return MaterialApp(
-                      title: 'Muses',
-                      navigatorKey: rootNavigatorKey,
-                      theme: lightTheme,
-                      darkTheme: darkTheme,
-                      themeMode: mode,
-                      scrollBehavior: const AppScrollBehavior(),
-                      home: TabletLayoutHost(
-                        navigatorKey: baseNavigatorKey,
-                        child: Navigator(
-                          key: baseNavigatorKey,
-                          initialRoute: AppRouter.initialRoute,
-                          onGenerateRoute: onGenerateRoute,
-                        ),
-                      ),
-                      onGenerateRoute: onGenerateRoute,
-                      builder: (context, child) {
-                        return ValueListenableBuilder<double>(
-                          valueListenable: AppBackgroundSettings.panelOpacity,
-                          builder: (context, panelOpacity, _) {
-                            return ValueListenableBuilder<double>(
-                              valueListenable:
-                                  AppBackgroundSettings.panelBlurStrength,
-                              builder:
-                                  (context, panelBlurStrength, unusedChild) {
-                                    final theme = Theme.of(context);
-                                    final isDark =
-                                        theme.brightness == Brightness.dark;
-                                    final navColor = theme.colorScheme.surface;
-                                    final overlay = SystemUiOverlayStyle(
-                                      statusBarColor: Colors.transparent,
-                                      statusBarIconBrightness: isDark
-                                          ? Brightness.light
-                                          : Brightness.dark,
-                                      statusBarBrightness: isDark
-                                          ? Brightness.dark
-                                          : Brightness.light,
-                                      systemNavigationBarColor: navColor,
-                                      systemNavigationBarIconBrightness: isDark
-                                          ? Brightness.light
-                                          : Brightness.dark,
-                                      systemNavigationBarDividerColor: navColor,
-                                    );
-                                    return AnnotatedRegion<
-                                      SystemUiOverlayStyle
-                                    >(
-                                      value: overlay,
-                                      child: child ?? const SizedBox.shrink(),
-                                    );
-                                  },
-                            );
-                          },
-                        );
-                      },
+            return MaterialApp(
+              title: 'Muses',
+              navigatorKey: rootNavigatorKey,
+              theme: lightTheme,
+              darkTheme: darkTheme,
+              themeMode: mode,
+              scrollBehavior: const AppScrollBehavior(),
+              home: TabletLayoutHost(
+                navigatorKey: baseNavigatorKey,
+                child: Navigator(
+                  key: baseNavigatorKey,
+                  initialRoute: AppRouter.initialRoute,
+                  onGenerateRoute: onGenerateRoute,
+                ),
+              ),
+              onGenerateRoute: onGenerateRoute,
+              builder: (context, child) {
+                return AnimatedBuilder(
+                  animation: Listenable.merge([
+                    AppBackgroundSettings.panelOpacity,
+                    AppBackgroundSettings.panelBlurStrength,
+                  ]),
+                  builder: (context, _) {
+                    final theme = Theme.of(context);
+                    final isDark = theme.brightness == Brightness.dark;
+                    final navColor = theme.colorScheme.surface;
+                    final overlay = SystemUiOverlayStyle(
+                      statusBarColor: Colors.transparent,
+                      statusBarIconBrightness: isDark
+                          ? Brightness.light
+                          : Brightness.dark,
+                      statusBarBrightness: isDark
+                          ? Brightness.dark
+                          : Brightness.light,
+                      systemNavigationBarColor: navColor,
+                      systemNavigationBarIconBrightness: isDark
+                          ? Brightness.light
+                          : Brightness.dark,
+                      systemNavigationBarDividerColor: navColor,
+                    );
+                    return AnnotatedRegion<SystemUiOverlayStyle>(
+                      value: overlay,
+                      child: child ?? const SizedBox.shrink(),
                     );
                   },
                 );

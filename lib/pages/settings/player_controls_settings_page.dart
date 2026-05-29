@@ -16,9 +16,7 @@ class _PlayerControlsSettingsPageState
   @override
   void initState() {
     super.initState();
-    PlayerBottomActionSettings.ensureLoaded();
-    AppLaunchPlaybackSettings.ensureLoaded();
-    MiniPlayerInfoSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
   }
 
   _BottomActionConfig _actionConfigByKey(String key) {

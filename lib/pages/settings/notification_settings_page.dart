@@ -18,7 +18,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   @override
   void initState() {
     super.initState();
-    MediaNotificationSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
     _loadCapabilities();
   }
 

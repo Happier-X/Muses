@@ -26,9 +26,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage>
   @override
   void initState() {
     super.initState();
-    AppCacheSettings.ensureLoaded();
-    SongDownloadSettings.ensureLoaded();
-    LibraryRefreshSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
     _loadCacheSizes();
   }
 

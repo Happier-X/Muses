@@ -16,10 +16,38 @@ class AppBackground extends StatefulWidget {
 }
 
 class _AppBackgroundState extends State<AppBackground> {
+  final Map<String, bool> _fileExistsCache = {};
+
   @override
   void initState() {
     super.initState();
     AppBackgroundSettings.ensureLoaded();
+    _checkFileExists(AppBackgroundSettings.backgroundImagePath.value);
+    AppBackgroundSettings.backgroundImagePath.addListener(_onImagePathChanged);
+  }
+
+  @override
+  void dispose() {
+    AppBackgroundSettings.backgroundImagePath.removeListener(_onImagePathChanged);
+    super.dispose();
+  }
+
+  void _onImagePathChanged() {
+    _checkFileExists(AppBackgroundSettings.backgroundImagePath.value);
+  }
+
+  Future<void> _checkFileExists(String? path) async {
+    if (path == null || path.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (_fileExistsCache.containsKey(path)) return;
+    final exists = await File(path).exists();
+    if (mounted) {
+      setState(() {
+        _fileExistsCache[path] = exists;
+      });
+    }
   }
 
   @override
@@ -42,7 +70,7 @@ class _AppBackgroundState extends State<AppBackground> {
         final hasImage =
             imagePath != null &&
             imagePath.isNotEmpty &&
-            File(imagePath).existsSync();
+            (_fileExistsCache[imagePath] ?? false);
         final baseColor = theme.scaffoldBackgroundColor;
         final maskColor = theme.scaffoldBackgroundColor.withValues(
           alpha: maskOpacity,

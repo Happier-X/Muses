@@ -17,7 +17,7 @@ class _PlayerAppearanceSettingsPageState
   @override
   void initState() {
     super.initState();
-    PlayerBackgroundSettings.ensureLoaded();
+    // All settings are already preloaded in main.dart
   }
 
   String _themeLabel(ThemeMode mode) {
