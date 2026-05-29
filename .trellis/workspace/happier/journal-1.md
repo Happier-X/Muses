@@ -135,3 +135,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Release v0.0.2 and update workflow
+
+**Date**: 2026-05-29
+**Task**: Release v0.0.2 and update workflow
+**Branch**: `main`
+
+### Summary
+
+重新发布 v0.0.2 版本，添加 CHANGELOG.md 维护更新日志，修改 release workflow 自动从 CHANGELOG.md 提取版本日志到 GitHub release notes
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `137031d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
