@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:open_file/open_file.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../app/services/app_update_service.dart';
 import '../../app/services/debug_log_service.dart';
@@ -108,7 +109,9 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
                   if (info.apkDownloadUrl != null) {
                     _downloadAndInstall(info);
                   } else {
-                    _openUrl(info.releaseUrl ?? AppUpdateService.releasePageUrl);
+                    _openUrl(
+                      info.releaseUrl ?? AppUpdateService.releasePageUrl,
+                    );
                   }
                 },
                 child: Text(info.apkDownloadUrl != null ? '下载更新' : '前往下载'),
@@ -121,7 +124,7 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
 
   Future<void> _downloadAndInstall(AppUpdateInfo info) async {
     if (_downloading) return;
-    
+
     final apkUrl = info.apkDownloadUrl;
     if (apkUrl == null) {
       _openUrl(info.releaseUrl ?? AppUpdateService.releasePageUrl);
@@ -152,9 +155,14 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
 
       if (!mounted) return;
       setState(() => _downloading = false);
-      
-      // 打开APK文件进行安装
-      final result = await OpenFile.open(filePath);
+
+      final canInstall = await _ensureCanInstallPackages();
+      if (!canInstall) return;
+
+      final result = await OpenFile.open(
+        filePath,
+        type: 'application/vnd.android.package-archive',
+      );
       if (result.type != ResultType.done) {
         if (!mounted) return;
         AppToast.show(context, '无法打开安装包', type: ToastType.error);
@@ -181,6 +189,20 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
 
   void _cancelDownload() {
     _cancelToken?.cancel('用户取消');
+  }
+
+  Future<bool> _ensureCanInstallPackages() async {
+    if (!Platform.isAndroid) return true;
+
+    final status = await Permission.requestInstallPackages.status;
+    if (status.isGranted) return true;
+
+    final requested = await Permission.requestInstallPackages.request();
+    if (requested.isGranted) return true;
+
+    if (!mounted) return false;
+    AppToast.show(context, '请允许安装未知应用后再重试', type: ToastType.error);
+    return false;
   }
 
   Future<void> _showUpdateFailedDialog() async {
@@ -320,15 +342,17 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : _downloading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              value: _downloadProgress > 0 ? _downloadProgress : null,
-                            ),
-                          )
-                        : const Icon(Icons.chevron_right_rounded),
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          value: _downloadProgress > 0
+                              ? _downloadProgress
+                              : null,
+                        ),
+                      )
+                    : const Icon(Icons.chevron_right_rounded),
                 onTap: _checking || _downloading ? null : _checkUpdate,
               ),
               if (_downloading)
