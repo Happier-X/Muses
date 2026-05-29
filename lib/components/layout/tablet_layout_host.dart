@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../app/state/settings_state.dart';
+import 'base/app_page_scaffold.dart';
 import 'base/app_background.dart';
 import '../player/mini_player/mini_player_bar.dart';
 import 'side_menu.dart';
@@ -142,6 +143,29 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
                       ),
                     ),
                   ),
+                ValueListenableBuilder<MiniPlayerOverlayConfig>(
+                  valueListenable: MiniPlayerOverlayState.config,
+                  builder: (context, config, _) {
+                    if (!config.visible || AppLayoutSettings.tabletMode.value) {
+                      return const SizedBox.shrink();
+                    }
+                    return Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: config.hasBottomNav
+                          ? bottomInset + AppPageScaffold.modernNavHeight
+                          : bottomInset,
+                      child: MiniPlayerBar(
+                        padding: config.hasBottomNav
+                            ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
+                            : const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 4,
+                              ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

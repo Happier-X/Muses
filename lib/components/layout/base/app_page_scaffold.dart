@@ -5,6 +5,22 @@ import 'app_background.dart';
 import '../../player/mini_player/mini_player_bar.dart';
 import '../modern_navigation_bar.dart';
 
+class MiniPlayerOverlayConfig {
+  final bool visible;
+  final bool hasBottomNav;
+
+  const MiniPlayerOverlayConfig({
+    required this.visible,
+    required this.hasBottomNav,
+  });
+}
+
+class MiniPlayerOverlayState {
+  static final ValueNotifier<MiniPlayerOverlayConfig> config = ValueNotifier(
+    const MiniPlayerOverlayConfig(visible: true, hasBottomNav: false),
+  );
+}
+
 class AppPageScaffold extends StatefulWidget {
   static const double modernNavHeight = 60.0;
 
@@ -67,6 +83,35 @@ class AppPageScaffoldState extends State<AppPageScaffold>
 
   bool get _hasDrawer => widget.drawer != null;
 
+  bool get _hasBottomNav =>
+      widget.bottomNavIndex != null && widget.onBottomNavTap != null;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _publishMiniPlayer());
+  }
+
+  @override
+  void didUpdateWidget(covariant AppPageScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.showMiniPlayer != widget.showMiniPlayer ||
+        oldWidget.bottomNavIndex != widget.bottomNavIndex ||
+        oldWidget.onBottomNavTap != widget.onBottomNavTap) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _publishMiniPlayer());
+    }
+  }
+
+  void _publishMiniPlayer() {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    MiniPlayerOverlayState.config.value = MiniPlayerOverlayConfig(
+      visible: widget.showMiniPlayer,
+      hasBottomNav: _hasBottomNav,
+    );
+  }
+
   void openDrawer() {
     if (!_hasDrawer) return;
     if (AppLayoutSettings.tabletMode.value) return;
@@ -117,33 +162,15 @@ class AppPageScaffoldState extends State<AppPageScaffold>
       );
     }
 
-    final hasBottomNav =
-        widget.bottomNavIndex != null && widget.onBottomNavTap != null;
+    _publishMiniPlayer();
+
+    final hasBottomNav = _hasBottomNav;
     final bottomBar = hasBottomNav
         ? ModernNavigationBar(
             currentIndex: widget.bottomNavIndex!,
             onTap: widget.onBottomNavTap!,
           )
         : null;
-    final miniPlayer = widget.showMiniPlayer
-        ? MiniPlayerBar(
-            padding: hasBottomNav
-                ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
-                : const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          )
-        : null;
-
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final miniPlayerBottom = hasBottomNav
-        ? (AppPageScaffold.modernNavHeight + bottomInset)
-        : bottomInset;
-    final keyboardInset = widget.resizeToAvoidBottomInset
-        ? MediaQuery.viewInsetsOf(context).bottom
-        : 0.0;
-    final effectiveMiniPlayerBottom = widget.keepBottomOverlayFixed
-        ? miniPlayerBottom - keyboardInset
-        : miniPlayerBottom;
-
     final drawerWidth = (MediaQuery.sizeOf(context).width * 0.62).clamp(
       220.0,
       300.0,
@@ -152,29 +179,13 @@ class AppPageScaffoldState extends State<AppPageScaffold>
     return ValueListenableBuilder<bool>(
       valueListenable: AppLayoutSettings.tabletMode,
       builder: (context, tabletMode, _) {
-        Widget buildBody({required bool includeMiniPlayer}) {
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              content,
-              if (miniPlayer != null && includeMiniPlayer)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: effectiveMiniPlayerBottom,
-                  child: miniPlayer,
-                ),
-            ],
-          );
-        }
-
         Widget page = Scaffold(
           resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
           extendBody: bottomBar != null,
           extendBodyBehindAppBar: widget.extendBodyBehindAppBar,
           backgroundColor: Colors.transparent,
           appBar: widget.appBar,
-          body: buildBody(includeMiniPlayer: !tabletMode),
+          body: content,
           bottomNavigationBar: bottomBar == null
               ? null
               : Material(type: MaterialType.transparency, child: bottomBar),
@@ -182,19 +193,6 @@ class AppPageScaffoldState extends State<AppPageScaffold>
 
         if (tabletMode || !_hasDrawer) {
           return AppBackground(child: page);
-        }
-        if (miniPlayer != null) {
-          page = Scaffold(
-            resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
-            extendBody: bottomBar != null,
-            extendBodyBehindAppBar: widget.extendBodyBehindAppBar,
-            backgroundColor: Colors.transparent,
-            appBar: widget.appBar,
-            body: buildBody(includeMiniPlayer: false),
-            bottomNavigationBar: bottomBar == null
-                ? null
-                : Material(type: MaterialType.transparency, child: bottomBar),
-          );
         }
         final stack = AppBackground(
           child: Stack(
@@ -257,13 +255,6 @@ class AppPageScaffoldState extends State<AppPageScaffold>
                 },
                 child: page,
               ),
-              if (miniPlayer != null)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: effectiveMiniPlayerBottom,
-                  child: miniPlayer,
-                ),
               AnimatedBuilder(
                 animation: _drawerController,
                 builder: (context, child) {
