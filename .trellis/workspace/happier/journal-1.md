@@ -201,3 +201,36 @@ Removed home page and recent playback page. Simplified app navigation by setting
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: Debug build coexistence with release
+
+**Date**: 2026-05-29
+**Task**: Debug build coexistence with release
+**Branch**: `main`
+
+### Summary
+
+Added dev/prod product flavors to build.gradle.kts so debug builds use com.happier.muses.dev package name, allowing debug and release APKs to coexist on device without data loss.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `943fde0` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
