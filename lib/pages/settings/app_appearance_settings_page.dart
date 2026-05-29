@@ -170,7 +170,7 @@ class _AppAppearanceSettingsPageState extends State<AppAppearanceSettingsPage> {
                 title: const Text('选择图片'),
                 onTap: () async {
                   Navigator.pop(context);
-                  final result = await FilePicker.platform.pickFiles(
+                  final result = await FilePicker.pickFiles(
                     type: FileType.image,
                     allowMultiple: false,
                   );

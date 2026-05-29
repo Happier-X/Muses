@@ -33,7 +33,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage>
   }
 
   Future<void> _pickDownloadDirectory() async {
-    final path = await FilePicker.platform.getDirectoryPath();
+    final path = await FilePicker.getDirectoryPath();
     if (path == null || path.trim().isEmpty) return;
     await SongDownloadSettings.setCustomDirectoryPath(path);
     await SongDownloadSettings.setUseCustomDirectory(true);

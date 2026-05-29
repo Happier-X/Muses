@@ -83,7 +83,7 @@ class SongDownloadService {
   Future<SongDownloadResult> chooseAndSaveToCustomFolder(
     SongEntity song,
   ) async {
-    final directoryPath = await FilePicker.platform.getDirectoryPath();
+    final directoryPath = await FilePicker.getDirectoryPath();
     if (directoryPath == null || directoryPath.trim().isEmpty) {
       return const SongDownloadResult(success: false, message: '已取消选择目录');
     }

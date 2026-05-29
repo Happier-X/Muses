@@ -125,7 +125,7 @@ class _LocalSourceSettingsPageState extends State<LocalSourceSettingsPage> {
   }
 
   Future<void> _addCustomFolder() async {
-    final path = await FilePicker.platform.getDirectoryPath();
+    final path = await FilePicker.getDirectoryPath();
     if (path == null || path.isEmpty) return;
     final current = _settings.includePaths.toList();
     if (current.contains(path)) {
