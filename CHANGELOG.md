@@ -6,6 +6,18 @@
 
 ## [Unreleased]
 
+## [0.0.6] - 2026-05-29
+
+### 新增
+- 实现 iOS 风格的丝滑页面过渡动画，当前页面和前一页一起滑动
+
+### 优化
+- 优化设置页面返回体验，消除卡顿感
+- 预加载所有设置到 main.dart，避免页面重复加载
+- 优化 app.dart 中的嵌套 ValueListenableBuilder，减少重建次数
+- 异步化 AppBackground 的文件存在检查，避免阻塞主线程
+- 移除 AppPageScaffold.build() 中的 _publishMiniPlayer() 调用，避免级联重建
+
 ## [0.0.5] - 2026-05-29
 
 ### 修复
