@@ -168,3 +168,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Remove home page and simplify navigation
+
+**Date**: 2026-05-29
+**Task**: Remove home page and simplify navigation
+**Branch**: `main`
+
+### Summary
+
+Removed home page and recent playback page. Simplified app navigation by setting /songs as initial route. Preserved album/artist detail pages while removing list pages. Migrated auto-play and library refresh logic to SongsPage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0138533` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
