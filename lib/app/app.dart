@@ -122,8 +122,8 @@ class MusesApp extends StatelessWidget {
                     );
                     final routes = AppRouter.routes;
                     Route<dynamic> onGenerateRoute(RouteSettings settings) {
-                      final name = settings.name ?? AppRoutes.home;
-                      final target = routes[name] ?? routes[AppRoutes.home]!;
+                      final name = settings.name ?? AppRoutes.songs;
+                      final target = routes[name] ?? routes[AppRoutes.songs]!;
                       return buildAppPageRoute<dynamic>(
                         target,
                         settings: settings,

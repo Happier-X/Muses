@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/home/home_page.dart';
 import '../../pages/source/source_page.dart';
 import '../../pages/songs/songs_page.dart';
 import '../../pages/player/player_page.dart';
@@ -22,7 +21,6 @@ import '../../pages/library/playlists_page.dart';
 import '../../pages/search/search_page.dart';
 
 class AppRoutes {
-  static const home = '/home';
   static const source = '/source';
   static const songs = '/songs';
   static const player = '/player';
@@ -45,10 +43,9 @@ class AppRoutes {
 }
 
 class AppRouter {
-  static String get initialRoute => AppRoutes.home;
+  static String get initialRoute => AppRoutes.songs;
 
   static Map<String, WidgetBuilder> get routes => {
-    AppRoutes.home: (_) => const HomePage(),
     AppRoutes.source: (_) => const SourcePage(),
     AppRoutes.songs: (_) => const SongsPage(),
     AppRoutes.player: (_) => const PlayerPage(),

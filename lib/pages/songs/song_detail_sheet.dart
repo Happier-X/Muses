@@ -11,7 +11,6 @@ import '../../app/services/cache/audio_cache_service.dart';
 import '../../app/services/db/dao/song_dao.dart';
 import '../../app/services/lyrics/lyrics_repository.dart';
 import '../../app/services/webdav/webdav_source_repository.dart';
-import '../../app/services/playlists_service.dart';
 import '../../app/services/metadata/tag_probe_service.dart';
 import '../../app/services/metadata/tag_probe_result.dart';
 import '../../app/services/player_service.dart';
@@ -76,7 +75,6 @@ class SongDetailSheet extends StatefulWidget {
 }
 
 class _SongDetailSheetState extends State<SongDetailSheet> {
-  final PlaylistsService _playlists = PlaylistsService.instance;
   bool _downloading = false;
 
   @override

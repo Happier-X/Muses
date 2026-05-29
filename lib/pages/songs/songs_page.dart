@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +10,7 @@ import 'package:signals_flutter/signals_flutter.dart' hide computed;
 import '../../app/router/app_router.dart';
 import '../../app/services/artwork_service.dart';
 import '../../app/services/db/dao/song_dao.dart';
+import '../../app/services/library_refresh_service.dart';
 import '../../app/services/local_music_service.dart';
 import '../../app/services/player_service.dart';
 import '../../app/services/webdav/webdav_source_repository.dart';
@@ -72,6 +74,10 @@ class _SongsPageState extends State<SongsPage>
   final WebDavSourceRepository _webDavRepo = WebDavSourceRepository.instance;
   final ArtworkService _artworkService = ArtworkService.instance;
   final PageCacheStore _cacheStore = PageCacheStore.instance;
+  final PlayerService _player = PlayerService.instance;
+  final LibraryRefreshService _libraryRefreshService =
+      LibraryRefreshService.instance;
+  bool _libraryRefreshTried = false;
   final SongsVisibleController _visibleController = SongsVisibleController();
   final SongsSelectionController _selectionController =
       SongsSelectionController();
@@ -118,7 +124,9 @@ class _SongsPageState extends State<SongsPage>
     super.initState();
     scheduleDeferredInit();
     _listController.addListener(_handleScroll);
-    PlayerService.instance.currentSong.addListener(_handlePlayerSongChanged);
+    _player.currentSong.addListener(_handlePlayerSongChanged);
+    unawaited(_tryAutoPlayOnAppLaunch());
+    unawaited(_tryRefreshLibraryOnLaunch());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 220), () {
         if (!mounted) return;
@@ -141,10 +149,67 @@ class _SongsPageState extends State<SongsPage>
     _rebuildDebounceTimer?.cancel();
     _artworkIdlePrefetchTimer?.cancel();
     _removeScrapeOverlay();
-    PlayerService.instance.currentSong.removeListener(_handlePlayerSongChanged);
+    _player.currentSong.removeListener(_handlePlayerSongChanged);
     _listController.removeListener(_handleScroll);
     _listController.dispose();
     super.dispose();
+  }
+
+  Future<void> _tryAutoPlayOnAppLaunch() async {
+    await AppLaunchPlaybackSettings.ensureLoaded();
+    if (AppLaunchPlaybackSettings.hasHandledAutoPlayThisSession) {
+      return;
+    }
+    AppLaunchPlaybackSettings.hasHandledAutoPlayThisSession = true;
+    if (!mounted || !AppLaunchPlaybackSettings.autoPlayOnAppLaunch.value) {
+      return;
+    }
+    var attempts = 0;
+    while (_player.currentSong.value == null && attempts < 8) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+      attempts += 1;
+    }
+    while (!_player.hasLoadedAudioSource && attempts < 16) {
+      await Future.delayed(const Duration(milliseconds: 200));
+      if (!mounted) return;
+      attempts += 1;
+    }
+    if (_player.currentSong.value == null ||
+        _player.isPlaying.value ||
+        !_player.hasLoadedAudioSource) {
+      return;
+    }
+    try {
+      await _player.play();
+    } catch (e) {
+      debugPrint('App auto play on launch failed: $e');
+    }
+  }
+
+  Future<void> _tryRefreshLibraryOnLaunch() async {
+    if (_libraryRefreshTried) return;
+    _libraryRefreshTried = true;
+
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
+
+    final result = await _libraryRefreshService.refreshOnLaunch();
+    if (!mounted || result == null) return;
+    if (!result.hasChanges) return;
+
+    await _loadSongs();
+    if (!mounted) return;
+
+    final parts = <String>[];
+    if (result.localAdded > 0) {
+      parts.add('本地 ${result.localAdded} 首');
+    }
+    if (result.cloudAdded > 0) {
+      parts.add('云端 ${result.cloudAdded} 首');
+    }
+    final detail = parts.join('，');
+    AppToast.show(context, '已自动刷新音源，新增 $detail', type: ToastType.success);
   }
 
   Future<void> _initPage() async {
@@ -305,14 +370,14 @@ class _SongsPageState extends State<SongsPage>
 
   void _handlePlayerSongChanged() {
     if (!mounted) return;
-    final song = PlayerService.instance.currentSong.value;
+    final song = _player.currentSong.value;
     _syncCurrentIdWithPlayer();
     if (song == null) return;
     _applySongUpdate(song);
   }
 
   void _syncCurrentIdWithPlayer([List<SongEntity>? visibleAll]) {
-    final song = PlayerService.instance.currentSong.value;
+    final song = _player.currentSong.value;
     if (song == null) {
       if (_currentId.value != null) {
         _currentId.value = null;
@@ -895,7 +960,7 @@ class _SongsPageState extends State<SongsPage>
     int startIndex,
   ) async {
     if (queue.isEmpty) return;
-    await PlayerService.instance.playQueue(queue, startIndex);
+    await _player.playQueue(queue, startIndex);
   }
 
   Future<void> _removeSelectedSongs() async {

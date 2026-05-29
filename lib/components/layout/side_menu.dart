@@ -102,19 +102,6 @@ class SideMenu extends StatelessWidget {
                       ),
                       _buildMenuItem(
                         context,
-                        Icons.library_music_rounded,
-                        '音乐库',
-                        () => _navigateAndClose(context, AppRoutes.home),
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(
-                          vertical: 8,
-                          horizontal: 12,
-                        ),
-                        child: Divider(height: 1),
-                      ),
-                      _buildMenuItem(
-                        context,
                         Icons.radar_rounded,
                         '音源',
                         () => _navigateAndClose(context, AppRoutes.source),

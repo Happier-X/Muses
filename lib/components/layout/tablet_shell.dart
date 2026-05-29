@@ -21,7 +21,7 @@ class TabletShell extends StatefulWidget {
 
 class TabletShellState extends State<TabletShell> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  String _currentRoute = AppRoutes.home;
+  String _currentRoute = AppRoutes.songs;
 
   void navigate(String route) {
     if (_currentRoute == route) return;
@@ -55,7 +55,7 @@ class TabletShellState extends State<TabletShell> {
             initialRoute: widget.initialRoute,
             onGenerateRoute: (settings) {
               final builder = widget.routes[settings.name];
-              final target = builder ?? widget.routes[AppRoutes.home]!;
+              final target = builder ?? widget.routes[AppRoutes.songs]!;
               return buildAppPageRoute(target, settings: settings);
             },
           ),
