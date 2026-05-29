@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/lyrics/lyrics_service.dart';
-import '../services/playlists_service.dart';
 import '../state/song_state.dart';
 import '../state/settings_state.dart';
 import 'android_platform_service.dart';

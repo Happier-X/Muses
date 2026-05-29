@@ -304,7 +304,7 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
                   ),
                 ),
               ),
-              const AppSettingTile(
+              AppSettingTile(
                 title: '当前版本',
                 subtitle: _version,
                 leading: Icon(Icons.info_outline_rounded),
