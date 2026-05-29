@@ -56,6 +56,8 @@ class AppPageScaffold extends StatefulWidget {
 class AppPageScaffoldState extends State<AppPageScaffold>
     with SingleTickerProviderStateMixin {
   static const Duration _drawerDuration = Duration(milliseconds: 240);
+  static const double _drawerSettleThreshold = 0.35;
+  static const double _drawerFlingVelocity = 360.0;
 
   late final AnimationController _drawerController = AnimationController(
     vsync: this,
@@ -75,6 +77,24 @@ class AppPageScaffoldState extends State<AppPageScaffold>
     if (!_hasDrawer) return;
     if (AppLayoutSettings.tabletMode.value) return;
     _drawerController.reverse();
+  }
+
+  void _settleDrawer(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() >= _drawerFlingVelocity) {
+      if (velocity > 0) {
+        openDrawer();
+      } else {
+        closeDrawer();
+      }
+      return;
+    }
+
+    if (_drawerController.value < _drawerSettleThreshold) {
+      closeDrawer();
+    } else {
+      openDrawer();
+    }
   }
 
   @override
@@ -215,10 +235,15 @@ class AppPageScaffoldState extends State<AppPageScaffold>
                           );
                       _drawerController.value = next;
                     },
-                    onHorizontalDragEnd: (_) {
+                    onHorizontalDragEnd: (details) {
                       if (!_draggingDrawer) return;
                       _draggingDrawer = false;
-                      if (_drawerController.value < 0.5) {
+                      _settleDrawer(details);
+                    },
+                    onHorizontalDragCancel: () {
+                      if (!_draggingDrawer) return;
+                      _draggingDrawer = false;
+                      if (_drawerController.value < _drawerSettleThreshold) {
                         closeDrawer();
                       } else {
                         openDrawer();
@@ -261,11 +286,7 @@ class AppPageScaffoldState extends State<AppPageScaffold>
                         _drawerController.value = next;
                       },
                       onHorizontalDragEnd: (details) {
-                        if (_drawerController.value < 0.5) {
-                          closeDrawer();
-                        } else {
-                          openDrawer();
-                        }
+                        _settleDrawer(details);
                       },
                       child: Container(color: Colors.transparent),
                     ),
