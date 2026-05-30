@@ -300,3 +300,38 @@ Added dev/prod product flavors to build.gradle.kts so debug builds use com.happi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: fix: 设置/统计页面侧边栏导航和汉堡图标
+
+**Date**: 2026-05-30
+**Task**: fix: 设置/统计页面侧边栏导航和汉堡图标
+**Branch**: `main`
+
+### Summary
+
+修复设置和统计页面的侧边栏导航行为：1) 统一使用 _navigateAndClose 清空导航栈；2) 添加 drawer: SideMenu()；3) 显式设置汉堡图标 leading 按钮；4) 使用 AppPageScaffoldState.openDrawer() 替代 Scaffold.of(context).openDrawer()。同时移除了不再使用的 _pushAndClose 方法和 onPush 参数。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `ccba944` | (see git log) |
+| `1edbc87` | (see git log) |
+| `d4363a5` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
