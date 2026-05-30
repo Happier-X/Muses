@@ -335,3 +335,36 @@ Added dev/prod product flavors to build.gradle.kts so debug builds use com.happi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: WebDAV添加时支持选择文件夹
+
+**Date**: 2026-05-31
+**Task**: WebDAV添加时支持选择文件夹
+**Branch**: `main`
+
+### Summary
+
+改进WebDAV音源添加流程，让用户在添加时就能选择扫描文件夹，而不是添加后进入编辑模式才能选择。移除了webdav_edit_page.dart中的isAdd条件判断，使文件夹选择区域在添加和编辑模式下都显示。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `89902c2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

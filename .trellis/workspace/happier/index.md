@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 8
-- **Last Active**: 2026-05-30
+- **Total Sessions**: 9
+- **Last Active**: 2026-05-31
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~337 | Active |
+| `journal-1.md` | ~370 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 9 | 2026-05-31 | WebDAV添加时支持选择文件夹 | `89902c2` | `main` |
 | 8 | 2026-05-30 | fix: 设置/统计页面侧边栏导航和汉堡图标 | `ccba944`, `1edbc87`, `d4363a5` | `main` |
 | 7 | 2026-05-30 | fix: dialog/bottom sheet z-index 与 mini player 层级问题 | `f101a7c` | `main` |
 | 6 | 2026-05-30 | fix: 歌曲页面返回重复路由问题 | `d57cd62` | `main` |
