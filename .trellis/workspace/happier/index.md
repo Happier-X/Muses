@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
-- **Last Active**: 2026-05-29
+- **Total Sessions**: 6
+- **Last Active**: 2026-05-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~236 | Active |
+| `journal-1.md` | ~269 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-05-30 | fix: 歌曲页面返回重复路由问题 | `d57cd62` | `main` |
 | 5 | 2026-05-29 | Debug build coexistence with release | `943fde0` | `main` |
 | 4 | 2026-05-29 | Remove home page and simplify navigation | `0138533` | `main` |
 | 3 | 2026-05-29 | Release v0.0.2 and update workflow | `137031d` | `main` |

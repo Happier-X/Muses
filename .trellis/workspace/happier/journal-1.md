@@ -234,3 +234,36 @@ Added dev/prod product flavors to build.gradle.kts so debug builds use com.happi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: fix: 歌曲页面返回重复路由问题
+
+**Date**: 2026-05-30
+**Task**: fix: 歌曲页面返回重复路由问题
+**Branch**: `main`
+
+### Summary
+
+定位并修复歌曲页面按返回时回到歌曲页面而非退出应用的bug。根因是 base Navigator 同时设置 initialRoute 和 home 内容，导致 /songs 路由在导航栈中重复。移除 initialRoute 参数后问题解决。同时归档了设置页面返回问题的4个迭代任务。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d57cd62` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
