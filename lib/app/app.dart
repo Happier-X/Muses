@@ -142,7 +142,6 @@ class MusesApp extends StatelessWidget {
                 navigatorKey: baseNavigatorKey,
                 child: Navigator(
                   key: baseNavigatorKey,
-                  initialRoute: AppRouter.initialRoute,
                   onGenerateRoute: onGenerateRoute,
                 ),
               ),
