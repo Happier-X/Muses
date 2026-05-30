@@ -34,6 +34,7 @@ class AppDialog extends StatelessWidget {
   }) {
     return showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AppDialog(
         title: title,
         contentText: content,

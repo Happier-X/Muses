@@ -89,6 +89,7 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
   Future<void> _showUpdateResultDialog(AppUpdateInfo info) async {
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return AlertDialog(
           title: Text(info.hasUpdate ? '发现新版本' : '当前已是最新版本'),
@@ -208,6 +209,7 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
   Future<void> _showUpdateFailedDialog() async {
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return AlertDialog(
           title: const Text('检查更新失败'),
@@ -244,6 +246,7 @@ class _VersionInfoPageState extends State<VersionInfoPage> {
   Future<void> _showLogExportDialog(String path) async {
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return AlertDialog(
           title: const Text('日志已导出'),

@@ -161,7 +161,7 @@ class _SourcePageState extends State<SourcePage> with SignalsMixin {
     final notifier = _notifierFor(source);
     showDialog(
       context: context,
-      useRootNavigator: false,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (ctx) {
         return ValueListenableBuilder<_ScanProgress>(
@@ -189,7 +189,7 @@ class _SourcePageState extends State<SourcePage> with SignalsMixin {
   void _closeScanDialog(SourceItem source, BuildContext dialogContext) {
     if (!_scanDialogsVisible.contains(source.id)) return;
     if (dialogContext.mounted) {
-      Navigator.of(dialogContext, rootNavigator: false).maybePop();
+      Navigator.of(dialogContext, rootNavigator: true).maybePop();
     }
   }
 

@@ -250,6 +250,7 @@ class _SongDetailSheetState extends State<SongDetailSheet> {
                 nav.pop();
                 showModalBottomSheet<void>(
                   context: nav.context,
+                  useRootNavigator: true,
                   backgroundColor: Colors.transparent,
                   isScrollControlled: true,
                   builder: (_) => SongInfoSheet(song: song),
@@ -264,6 +265,7 @@ class _SongDetailSheetState extends State<SongDetailSheet> {
                 nav.pop();
                 final updated = await showModalBottomSheet<SongEntity>(
                   context: nav.context,
+                  useRootNavigator: true,
                   backgroundColor: Colors.transparent,
                   isScrollControlled: true,
                   builder: (_) => SongScrapeSheet(song: song),
@@ -280,6 +282,7 @@ class _SongDetailSheetState extends State<SongDetailSheet> {
               onTap: () async {
                 final ok = await showDialog<bool>(
                   context: context,
+                  useRootNavigator: true,
                   builder: (context) {
                     return AlertDialog(
                       title: const Text('移除歌曲'),

@@ -115,6 +115,7 @@ class _FolderSongsPageState extends State<FolderSongsPage> with SignalsMixin {
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return SortSheet(
@@ -165,6 +166,7 @@ class _FolderSongsPageState extends State<FolderSongsPage> with SignalsMixin {
   void _showRemoveDialog() {
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       builder: (ctx) {
         return ValueListenableBuilder<_RemoveProgress>(
@@ -373,6 +375,7 @@ class _FolderSongsPageState extends State<FolderSongsPage> with SignalsMixin {
                         if (_multiSelect.value) return;
                         showModalBottomSheet<void>(
                           context: context,
+                          useRootNavigator: true,
                           backgroundColor: Colors.transparent,
                           isScrollControlled: true,
                           builder: (_) => SongDetailSheet(song: song),

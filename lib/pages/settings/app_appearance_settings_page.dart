@@ -118,6 +118,7 @@ class _AppAppearanceSettingsPageState extends State<AppAppearanceSettingsPage> {
         AppThemeSettings.themeSeedColor.value ?? const Color(0xFF3B82F6);
     await showDialog(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return _ThemeColorPickerDialog(
           initialColor: current,
@@ -158,6 +159,7 @@ class _AppAppearanceSettingsPageState extends State<AppAppearanceSettingsPage> {
   Future<void> _showBackgroundImageSheet(BuildContext context) async {
     await showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return SafeArea(
           child: Column(

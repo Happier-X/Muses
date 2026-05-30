@@ -187,6 +187,7 @@ class _ArtistsPageState extends State<ArtistsPage>
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return SortSheet(
@@ -268,6 +269,7 @@ class _ArtistsPageState extends State<ArtistsPage>
   void _showBlockedArtists() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
@@ -389,6 +391,7 @@ class _ArtistsPageState extends State<ArtistsPage>
                   onLongPress: () {
                     showModalBottomSheet(
                       context: context,
+                      useRootNavigator: true,
                       backgroundColor: Colors.transparent,
                       builder: (context) {
                         return AppSheetPanel(

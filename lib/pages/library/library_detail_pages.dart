@@ -356,6 +356,7 @@ class _ArtistDetailPageState extends State<ArtistDetailPage> with SignalsMixin {
                       onLongPress: () {
                         showModalBottomSheet(
                           context: context,
+                          useRootNavigator: true,
                           backgroundColor: Colors.transparent,
                           isScrollControlled: true,
                           builder: (_) => SongDetailSheet(
@@ -719,6 +720,7 @@ class _AlbumDetailPageState extends State<AlbumDetailPage> with SignalsMixin {
                       onLongPress: () {
                         showModalBottomSheet(
                           context: context,
+                          useRootNavigator: true,
                           backgroundColor: Colors.transparent,
                           isScrollControlled: true,
                           builder: (_) => SongDetailSheet(

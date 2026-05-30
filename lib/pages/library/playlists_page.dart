@@ -163,6 +163,7 @@ class _PlaylistsPageState extends State<PlaylistsPage>
   Future<void> _deletePlaylist(PlaylistEntity playlist) async {
     final confirmed = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (context) => AppDialog(
         title: '删除歌单',
         contentText: '确定删除「${playlist.name}」吗？',
@@ -180,6 +181,7 @@ class _PlaylistsPageState extends State<PlaylistsPage>
   void _showPlaylistSheet(PlaylistEntity playlist) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
@@ -258,6 +260,7 @@ class _PlaylistsPageState extends State<PlaylistsPage>
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
@@ -456,6 +459,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage>
   Future<void> _showSortSheet() async {
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => SortSheet(
@@ -503,6 +507,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage>
   void _showRemoveDialog() {
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       builder: (ctx) {
         return ValueListenableBuilder<_RemoveProgress>(
@@ -829,6 +834,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage>
                                 : () async {
                                     final confirmed = await showDialog<bool>(
                                       context: context,
+                                      useRootNavigator: true,
                                       builder: (ctx) {
                                         return AlertDialog(
                                           title: const Text('移出选中歌曲'),
@@ -938,6 +944,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage>
           onLongPress: () {
             showModalBottomSheet<void>(
               context: context,
+              useRootNavigator: true,
               backgroundColor: Colors.transparent,
               isScrollControlled: true,
               builder: (_) => SongDetailSheet(
@@ -980,6 +987,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage>
           confirmDismiss: (direction) async {
             return await showDialog<bool>(
               context: context,
+              useRootNavigator: true,
               builder: (context) {
                 return AlertDialog(
                   title: const Text('移除歌曲'),
@@ -1121,6 +1129,7 @@ Future<bool> showAddToPlaylistDialog(
 
   final result = await showDialog<bool>(
     context: context,
+    useRootNavigator: true,
     builder: (dialogContext) {
       return AppDialog(
         title: '添加到歌单',
@@ -1189,6 +1198,7 @@ Future<void> _showPlaylistNameDialog(
 }) async {
   await showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {

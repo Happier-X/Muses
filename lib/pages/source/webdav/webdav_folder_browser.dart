@@ -167,6 +167,7 @@ class _WebDavFolderBrowserState extends State<WebDavFolderBrowser>
                         onTap: () {
                           showModalBottomSheet(
                             context: context,
+                            useRootNavigator: true,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
                             builder: (_) => BlockedManagementSheet(
@@ -218,6 +219,7 @@ class _WebDavFolderBrowserState extends State<WebDavFolderBrowser>
                   final pageContext = context;
                   showModalBottomSheet(
                     context: pageContext,
+                    useRootNavigator: true,
                     backgroundColor: Colors.transparent,
                     builder: (sheetContext) {
                       return AppSheetPanel(

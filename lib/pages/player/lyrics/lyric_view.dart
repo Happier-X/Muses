@@ -149,6 +149,7 @@ class _PlayerLyricsViewState extends State<PlayerLyricsView> with SignalsMixin {
   }) async {
     await showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (context) {
         return _LyricsColorPickerDialog(
           title: title,
@@ -184,6 +185,7 @@ class _PlayerLyricsViewState extends State<PlayerLyricsView> with SignalsMixin {
   void _openLyricsSettingsSheet() {
     showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       isDismissible: true,

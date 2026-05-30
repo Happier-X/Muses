@@ -514,6 +514,7 @@ class _BottomActions extends StatelessWidget {
   void _showSleepTimerSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _SleepTimerSheet(player: player),
@@ -532,6 +533,7 @@ class _BottomActions extends StatelessWidget {
     }
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => SongDetailSheet(
@@ -557,6 +559,7 @@ class _BottomActions extends StatelessWidget {
 void showPlayerPlaylistSheet(BuildContext context, PlayerService player) {
   showModalBottomSheet(
     context: context,
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     builder: (_) => _PlaylistSheet(player: player),

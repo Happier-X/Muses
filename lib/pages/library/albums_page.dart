@@ -229,6 +229,7 @@ class _AlbumsPageState extends State<AlbumsPage>
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         return SortSheet(
@@ -333,6 +334,7 @@ class _AlbumsPageState extends State<AlbumsPage>
   void _showBlockedAlbums() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) {
@@ -445,6 +447,7 @@ class _AlbumsPageState extends State<AlbumsPage>
                     onLongPress: () {
                       showModalBottomSheet(
                         context: context,
+                        useRootNavigator: true,
                         backgroundColor: Colors.transparent,
                         builder: (context) {
                           return AppSheetPanel(
@@ -688,6 +691,7 @@ class _AlbumsPageState extends State<AlbumsPage>
                                     onLongPressStart: (details) {
                                       showModalBottomSheet(
                                         context: context,
+                                        useRootNavigator: true,
                                         backgroundColor: Colors.transparent,
                                         builder: (context) {
                                           return AppSheetPanel(

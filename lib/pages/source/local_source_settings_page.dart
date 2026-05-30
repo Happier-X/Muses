@@ -165,7 +165,7 @@ class _LocalSourceSettingsPageState extends State<LocalSourceSettingsPage> {
     _scanDialogVisible = true;
     showDialog(
       context: context,
-      useRootNavigator: false,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (ctx) {
         return ValueListenableBuilder<LocalScanProgress>(
@@ -193,7 +193,7 @@ class _LocalSourceSettingsPageState extends State<LocalSourceSettingsPage> {
   void _closeScanDialog(BuildContext dialogContext) {
     if (!_scanDialogVisible) return;
     if (dialogContext.mounted) {
-      Navigator.of(dialogContext, rootNavigator: false).maybePop();
+      Navigator.of(dialogContext, rootNavigator: true).maybePop();
     }
   }
 

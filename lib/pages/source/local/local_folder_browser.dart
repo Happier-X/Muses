@@ -123,6 +123,7 @@ class _LocalFolderBrowserState extends State<LocalFolderBrowser>
                         onTap: () {
                           showModalBottomSheet(
                             context: context,
+                            useRootNavigator: true,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
                             builder: (_) => BlockedManagementSheet(
@@ -172,6 +173,7 @@ class _LocalFolderBrowserState extends State<LocalFolderBrowser>
                   final pageContext = context;
                   showModalBottomSheet(
                     context: pageContext,
+                    useRootNavigator: true,
                     backgroundColor: Colors.transparent,
                     builder: (sheetContext) {
                       return AppSheetPanel(

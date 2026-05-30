@@ -297,6 +297,7 @@ class _SearchPageState extends State<SearchPage> {
                                 onLongPress: () {
                                   showModalBottomSheet<void>(
                                     context: context,
+                                    useRootNavigator: true,
                                     backgroundColor: Colors.transparent,
                                     isScrollControlled: true,
                                     builder: (_) => SongDetailSheet(song: song),

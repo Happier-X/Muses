@@ -534,6 +534,7 @@ class _SongsPageState extends State<SongsPage>
     var tempCount = _configuredOrAllCount(initialCount, maxCount).toDouble();
     await showModalBottomSheet<void>(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         return StatefulBuilder(
@@ -638,6 +639,7 @@ class _SongsPageState extends State<SongsPage>
   void _showRemoveDialog() {
     showDialog(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: true,
       builder: (ctx) {
         return ValueListenableBuilder<_RemoveProgress>(
@@ -831,6 +833,7 @@ class _SongsPageState extends State<SongsPage>
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
         final items = [
@@ -901,16 +904,11 @@ class _SongsPageState extends State<SongsPage>
   void _showSortSheet() {
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: Colors.transparent,
       useSafeArea: true,
       builder: (context) {
-        final bottomInset = MediaQuery.paddingOf(context).bottom;
-        final tabletOverlayInset = AppLayoutSettings.tabletMode.value
-            ? MiniPlayerBar.estimatedHeight + bottomInset + 16
-            : 0.0;
-        return Padding(
-          padding: EdgeInsets.only(bottom: tabletOverlayInset),
-          child: SortSheet(
+        return SortSheet(
             options: const [
               SortOption(
                 key: 'title',
@@ -941,8 +939,7 @@ class _SongsPageState extends State<SongsPage>
               _rebuildVisibleSongs();
               _saveViewPrefs();
             },
-          ),
-        );
+          );
       },
     );
   }
@@ -1211,6 +1208,7 @@ class _SongsPageState extends State<SongsPage>
 
                               showModalBottomSheet<void>(
                                 context: context,
+                                useRootNavigator: true,
                                 backgroundColor: Colors.transparent,
                                 isScrollControlled: true,
                                 builder: (_) {

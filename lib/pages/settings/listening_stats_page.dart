@@ -351,6 +351,7 @@ class _ListeningStatsPageState extends State<ListeningStatsPage> {
                           onLongPress: () {
                             showModalBottomSheet<void>(
                               context: context,
+                              useRootNavigator: true,
                               backgroundColor: Colors.transparent,
                               isScrollControlled: true,
                               builder: (_) => SongDetailSheet(song: song),

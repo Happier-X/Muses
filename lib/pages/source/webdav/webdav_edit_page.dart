@@ -112,6 +112,7 @@ class _WebDavEditPageState extends State<WebDavEditPage> {
   Future<void> _removeFolder(String path) async {
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => AppDialog(
         title: '移除文件夹',
         contentText: '确认不再扫描该文件夹吗？\n$path',
@@ -177,6 +178,7 @@ class _WebDavEditPageState extends State<WebDavEditPage> {
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => AppDialog(
         title: '删除 WebDAV',
         contentText:
