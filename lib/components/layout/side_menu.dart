@@ -55,7 +55,7 @@ class SideMenu extends StatelessWidget {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Image.asset(
-                        '开发文档/NagoAPP图标.png',
+                        '开发文档/logo.png',
                         fit: BoxFit.cover,
                       ),
                     ),
