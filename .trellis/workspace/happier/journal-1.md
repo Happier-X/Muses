@@ -267,3 +267,36 @@ Added dev/prod product flavors to build.gradle.kts so debug builds use com.happi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 7: fix: dialog/bottom sheet z-index 与 mini player 层级问题
+
+**Date**: 2026-05-30
+**Task**: fix: dialog/bottom sheet z-index 与 mini player 层级问题
+**Branch**: `main`
+
+### Summary
+
+给所有 showDialog/showModalBottomSheet 调用添加 useRootNavigator: true（19个文件，51个调用点），使 dialog 渲染在 root Navigator overlay 中，位于 MiniPlayerBar 之上。同时移除了 songs_page 中排序 sheet 的 tabletOverlayInset padding 补偿。修复了扫描进度 dialog 的关闭逻辑（同步 rootNavigator: true）。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f101a7c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
