@@ -263,31 +263,29 @@ class _WebDavEditPageState extends State<WebDavEditPage> {
               ),
             ],
           ),
-          if (!widget.isAdd) ...[
-            const SizedBox(height: 16),
-            AppSettingSection(
-              title: '扫描文件夹',
-              children: [
-                if (folders.isNotEmpty)
-                  ...folders.map(
-                    (path) => AppSettingTile(
-                      title: path,
-                      leading: const Icon(Icons.folder_outlined),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: _saving ? null : () => _removeFolder(path),
-                      ),
+          const SizedBox(height: 16),
+          AppSettingSection(
+            title: '扫描文件夹',
+            children: [
+              if (folders.isNotEmpty)
+                ...folders.map(
+                  (path) => AppSettingTile(
+                    title: path,
+                    leading: const Icon(Icons.folder_outlined),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: _saving ? null : () => _removeFolder(path),
                     ),
                   ),
-                AppSettingTile(
-                  title: '选择文件夹（可多选）',
-                  leading: const Icon(Icons.create_new_folder_outlined),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: _saving ? null : _pickFolder,
                 ),
-              ],
-            ),
-          ],
+              AppSettingTile(
+                title: '选择文件夹（可多选）',
+                leading: const Icon(Icons.create_new_folder_outlined),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: _saving ? null : _pickFolder,
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
