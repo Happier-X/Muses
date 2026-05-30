@@ -20,6 +20,7 @@ class ListeningStatsPage extends StatefulWidget {
 }
 
 class _ListeningStatsPageState extends State<ListeningStatsPage> {
+  final _scaffoldKey = GlobalKey<AppPageScaffoldState>();
   final StatsService _statsService = StatsService.instance;
   final SongDao _songDao = SongDao();
   final PlayerService _player = PlayerService.instance;
@@ -103,14 +104,13 @@ class _ListeningStatsPageState extends State<ListeningStatsPage> {
   Widget build(BuildContext context) {
     final bottomPadding = AppPageScaffold.scrollableBottomPadding(context);
     return AppPageScaffold(
+      key: _scaffoldKey,
       extendBodyBehindAppBar: true,
       appBar: AppTopBar(
         title: '听歌统计',
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,

@@ -11,6 +11,8 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final _scaffoldKey = GlobalKey<AppPageScaffoldState>();
+
   @override
   void initState() {
     super.initState();
@@ -21,14 +23,13 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final bottomPadding = AppPageScaffold.scrollableBottomPadding(context);
     return AppPageScaffold(
+      key: _scaffoldKey,
       extendBodyBehindAppBar: true,
       appBar: AppTopBar(
         title: '设置',
-        leading: Builder(
-          builder: (context) => IconButton(
-            icon: const Icon(Icons.menu_rounded),
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
