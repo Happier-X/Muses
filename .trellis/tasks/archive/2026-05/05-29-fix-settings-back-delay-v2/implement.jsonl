@@ -1,0 +1,7 @@
+﻿{"file": "lib/app/app.dart", "reason": "Contains nested ValueListenableBuilder wrapping MaterialApp - main cause of unnecessary rebuilds"}
+{"file": "lib/app/theme/app_styles.dart", "reason": "CoverPageTransitionsBuilder with CurvedAnimation memory leak"}
+{"file": "lib/components/layout/base/app_background.dart", "reason": "Contains synchronous File.existsSync() call on main thread"}
+{"file": "lib/components/layout/base/app_page_scaffold.dart", "reason": "Contains addPostFrameCallback in initState that triggers state updates"}
+{"file": "lib/pages/settings/settings_page.dart", "reason": "Contains nested ValueListenableBuilder patterns"}
+{"file": "lib/pages/settings/app_appearance_settings_page.dart", "reason": "Heavy page with many nested ValueListenableBuilders"}
+{"file": "lib/pages/settings/player_controls_settings_page.dart", "reason": "Contains nested ValueListenableBuilder in ReorderableListView"}

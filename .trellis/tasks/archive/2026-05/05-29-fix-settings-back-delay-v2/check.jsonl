@@ -1,0 +1,5 @@
+﻿{"file": "lib/app/app.dart", "reason": "Verify MaterialApp rebuild optimization works correctly"}
+{"file": "lib/app/theme/app_styles.dart", "reason": "Verify CurvedAnimation memory leak is fixed"}
+{"file": "lib/components/layout/base/app_background.dart", "reason": "Verify async file check does not break background rendering"}
+{"file": "lib/components/layout/base/app_page_scaffold.dart", "reason": "Verify mini player overlay still works correctly"}
+{"file": "lib/pages/settings/settings_page.dart", "reason": "Verify settings page renders correctly after optimization"}
