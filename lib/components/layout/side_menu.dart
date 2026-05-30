@@ -6,10 +6,9 @@ import 'base/app_page_scaffold.dart';
 
 class SideMenu extends StatelessWidget {
   final ValueChanged<String>? onNavigate;
-  final ValueChanged<String>? onPush;
   final VoidCallback? onCloseDrawer;
 
-  const SideMenu({super.key, this.onNavigate, this.onPush, this.onCloseDrawer});
+  const SideMenu({super.key, this.onNavigate, this.onCloseDrawer});
 
   @override
   Widget build(BuildContext context) {
@@ -110,13 +109,13 @@ class SideMenu extends StatelessWidget {
                         context,
                         Icons.bar_chart_rounded,
                         '统计',
-                        () => _pushAndClose(context, AppRoutes.listeningStats),
+                        () => _navigateAndClose(context, AppRoutes.listeningStats),
                       ),
                       _buildMenuItem(
                         context,
                         Icons.settings_rounded,
                         '设置',
-                        () => _pushAndClose(context, AppRoutes.settings),
+                        () => _navigateAndClose(context, AppRoutes.settings),
                       ),
                     ],
                   ),
@@ -158,16 +157,6 @@ class SideMenu extends StatelessWidget {
     if (!context.mounted) return;
     _closeDrawer(context);
     Navigator.pushNamedAndRemoveUntil(context, route, (route) => false);
-  }
-
-  void _pushAndClose(BuildContext context, String route) {
-    if (onPush != null) {
-      onPush?.call(route);
-      return;
-    }
-    if (!context.mounted) return;
-    _closeDrawer(context);
-    Navigator.pushNamed(context, route);
   }
 
   void _closeDrawer(BuildContext context) {

@@ -8,6 +8,7 @@ import '../../components/common/artwork_widget.dart';
 import '../../components/common/setting_widgets.dart';
 import '../../components/layout/base/app_page_scaffold.dart';
 import '../../components/layout/base/app_top_bar.dart';
+import '../../components/layout/side_menu.dart';
 import '../../components/list/media_list_tile.dart';
 import '../songs/song_detail_sheet.dart';
 
@@ -108,6 +109,7 @@ class _ListeningStatsPageState extends State<ListeningStatsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
+      drawer: const SideMenu(),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

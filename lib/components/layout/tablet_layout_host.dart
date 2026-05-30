@@ -127,7 +127,6 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
                     ignoring: t == 0,
                     child: SideMenu(
                       onNavigate: _handleNavigate,
-                      onPush: _handlePush,
                     ),
                   ),
                 ),
@@ -180,9 +179,5 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
       route,
       (route) => false,
     );
-  }
-
-  void _handlePush(String route) {
-    widget.navigatorKey.currentState?.pushNamed(route);
   }
 }

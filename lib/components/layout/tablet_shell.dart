@@ -32,13 +32,6 @@ class TabletShellState extends State<TabletShell> {
     });
   }
 
-  void push(String route) {
-    SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _navigatorKey.currentState?.pushNamed(route);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -47,7 +40,7 @@ class TabletShellState extends State<TabletShell> {
       children: [
         SizedBox(
           width: drawerWidth,
-          child: SideMenu(onNavigate: navigate, onPush: push),
+          child: SideMenu(onNavigate: navigate),
         ),
         Expanded(
           child: Navigator(

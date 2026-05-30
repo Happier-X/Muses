@@ -27,6 +27,7 @@ class _SettingsPageState extends State<SettingsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
+      drawer: const SideMenu(),
       body: ListView(
         padding: EdgeInsets.fromLTRB(16, 12, 16, bottomPadding),
         children: [
