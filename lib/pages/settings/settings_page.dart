@@ -22,8 +22,14 @@ class _SettingsPageState extends State<SettingsPage> {
     final bottomPadding = AppPageScaffold.scrollableBottomPadding(context);
     return AppPageScaffold(
       extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
+      appBar: AppTopBar(
         title: '设置',
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),

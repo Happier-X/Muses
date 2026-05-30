@@ -104,8 +104,14 @@ class _ListeningStatsPageState extends State<ListeningStatsPage> {
     final bottomPadding = AppPageScaffold.scrollableBottomPadding(context);
     return AppPageScaffold(
       extendBodyBehindAppBar: true,
-      appBar: const AppTopBar(
+      appBar: AppTopBar(
         title: '听歌统计',
+        leading: Builder(
+          builder: (context) => IconButton(
+            icon: const Icon(Icons.menu_rounded),
+            onPressed: () => Scaffold.of(context).openDrawer(),
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
