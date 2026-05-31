@@ -72,13 +72,8 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
         final width = MediaQuery.sizeOf(context).width;
         final drawerWidth = (width * 0.32).clamp(200.0, 260.0);
         final pageOffset = drawerWidth * t;
-        final scale = 1 - (0.02 * t);
-        final contentWidth = (width - pageOffset).clamp(0.0, width);
         final bottomInset = MediaQuery.paddingOf(context).bottom;
-        final pageRadius = 24.0 * t;
-        final pageShadow = Theme.of(context).brightness == Brightness.dark
-            ? Colors.black.withValues(alpha: 0.28 * t)
-            : Colors.black.withValues(alpha: 0.08 * t);
+        final isTabletMode = AppLayoutSettings.tabletMode.value && t == 1;
 
         return PopScope(
           canPop: false,
@@ -93,39 +88,7 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
           },
           child: Stack(
             children: [
-              Positioned.fill(
-                child: ClipRect(
-                  child: Padding(
-                    padding: EdgeInsets.only(left: pageOffset),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: SizedBox(
-                        width: contentWidth,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(pageRadius),
-                            boxShadow: [
-                              BoxShadow(
-                                color: pageShadow,
-                                blurRadius: 28 * t,
-                                offset: Offset(0, 10 * t),
-                              ),
-                            ],
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(pageRadius),
-                            child: Transform.scale(
-                              scale: scale,
-                              alignment: Alignment.centerLeft,
-                              child: child,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+              Positioned.fill(left: pageOffset, child: child!),
               Positioned(
                 left: -drawerWidth + drawerWidth * t,
                 top: 0,
@@ -136,7 +99,7 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
                   child: SideMenu(onNavigate: _handleNavigate),
                 ),
               ),
-              if (t > 0)
+              if (isTabletMode)
                 Positioned(
                   left: 0,
                   right: 0,
