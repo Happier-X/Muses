@@ -38,8 +38,9 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!AppLayoutSettings.hasUserSet) {
-        final width = MediaQuery.sizeOf(context).width;
-        if (width > 600) {
+        final size = MediaQuery.sizeOf(context);
+        final isLandscape = size.width > size.height;
+        if (size.width > 600 && isLandscape) {
           AppLayoutSettings.tabletMode.value = true;
         }
       }
