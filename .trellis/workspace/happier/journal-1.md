@@ -434,3 +434,36 @@ Added dev/prod product flavors to build.gradle.kts so debug builds use com.happi
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: 优化CI构建速度并修复签名问题
+
+**Date**: 2026-05-31
+**Task**: 优化CI构建速度并修复签名问题
+**Branch**: `main`
+
+### Summary
+
+优化GitHub Action构建速度（使用ubuntu-latest-xl、添加缓存、--no-tree-shake-icons参数），修复应用内更新签名不匹配问题（key.properties属性名修正），更新CHANGELOG.md，重新发布v0.0.8版本
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `81b1b70` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
