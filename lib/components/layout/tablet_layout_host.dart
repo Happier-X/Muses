@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 
 import '../../app/state/settings_state.dart';
 import 'base/app_page_scaffold.dart';
-import 'base/app_background.dart';
 import '../player/mini_player/mini_player_bar.dart';
 import 'side_menu.dart';
 
@@ -92,35 +91,33 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
             }
             SystemNavigator.pop();
           },
-          child: AppBackground(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: ClipRect(
-                    child: Padding(
-                      padding: EdgeInsets.only(left: pageOffset),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: SizedBox(
-                          width: contentWidth,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(pageRadius),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: pageShadow,
-                                  blurRadius: 28 * t,
-                                  offset: Offset(0, 10 * t),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(pageRadius),
-                              child: Transform.scale(
-                                scale: scale,
-                                alignment: Alignment.centerLeft,
-                                child: child,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ClipRect(
+                  child: Padding(
+                    padding: EdgeInsets.only(left: pageOffset),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: SizedBox(
+                        width: contentWidth,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(pageRadius),
+                            boxShadow: [
+                              BoxShadow(
+                                color: pageShadow,
+                                blurRadius: 28 * t,
+                                offset: Offset(0, 10 * t),
                               ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(pageRadius),
+                            child: Transform.scale(
+                              scale: scale,
+                              alignment: Alignment.centerLeft,
+                              child: child,
                             ),
                           ),
                         ),
@@ -128,53 +125,53 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
                     ),
                   ),
                 ),
-                Positioned(
-                  left: -drawerWidth + drawerWidth * t,
-                  top: 0,
-                  bottom: 0,
-                  width: drawerWidth,
-                  child: IgnorePointer(
-                    ignoring: t == 0,
-                    child: SideMenu(onNavigate: _handleNavigate),
-                  ),
+              ),
+              Positioned(
+                left: -drawerWidth + drawerWidth * t,
+                top: 0,
+                bottom: 0,
+                width: drawerWidth,
+                child: IgnorePointer(
+                  ignoring: t == 0,
+                  child: SideMenu(onNavigate: _handleNavigate),
                 ),
-                if (t > 0)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: bottomInset,
-                    child: MiniPlayerBar(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 4,
-                      ),
+              ),
+              if (t > 0)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: bottomInset,
+                  child: MiniPlayerBar(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
                     ),
                   ),
-                ValueListenableBuilder<MiniPlayerOverlayConfig>(
-                  valueListenable: MiniPlayerOverlayState.config,
-                  builder: (context, config, _) {
-                    if (!config.visible || AppLayoutSettings.tabletMode.value) {
-                      return const SizedBox.shrink();
-                    }
-                    return Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: config.hasBottomNav
-                          ? bottomInset + AppPageScaffold.modernNavHeight
-                          : bottomInset,
-                      child: MiniPlayerBar(
-                        padding: config.hasBottomNav
-                            ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
-                            : const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                      ),
-                    );
-                  },
                 ),
-              ],
-            ),
+              ValueListenableBuilder<MiniPlayerOverlayConfig>(
+                valueListenable: MiniPlayerOverlayState.config,
+                builder: (context, config, _) {
+                  if (!config.visible || AppLayoutSettings.tabletMode.value) {
+                    return const SizedBox.shrink();
+                  }
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: config.hasBottomNav
+                        ? bottomInset + AppPageScaffold.modernNavHeight
+                        : bottomInset,
+                    child: MiniPlayerBar(
+                      padding: config.hasBottomNav
+                          ? const EdgeInsets.fromLTRB(16, 4, 16, 0)
+                          : const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
         );
       },
