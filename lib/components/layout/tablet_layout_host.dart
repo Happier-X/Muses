@@ -34,17 +34,6 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
       _controller.value = 1;
     }
     AppLayoutSettings.tabletMode.addListener(_handleModeChanged);
-    // 等待第一帧获取正确的屏幕宽度
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (!AppLayoutSettings.hasUserSet) {
-        final size = MediaQuery.sizeOf(context);
-        final isLandscape = size.width > size.height;
-        if (size.width > 600 && isLandscape) {
-          AppLayoutSettings.tabletMode.value = true;
-        }
-      }
-    });
   }
 
   @override
