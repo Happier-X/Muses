@@ -1086,7 +1086,7 @@ class _SongsPageState extends State<SongsPage>
           showMiniPlayer: !_multiSelect.value,
           appBar: AppTopBar(
             title: '歌曲',
-            centerTitle: !isTabletLandscape,
+            centerTitle: true,
             leading: IconButton(
               icon: const Icon(Icons.menu_rounded),
               onPressed: _openDrawer,
