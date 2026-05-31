@@ -1087,10 +1087,12 @@ class _SongsPageState extends State<SongsPage>
           appBar: AppTopBar(
             title: '歌曲',
             centerTitle: true,
-            leading: IconButton(
-              icon: const Icon(Icons.menu_rounded),
-              onPressed: _openDrawer,
-            ),
+            leading: isTabletLandscape
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.menu_rounded),
+                    onPressed: _openDrawer,
+                  ),
             actions: [
               IconButton(
                 icon: const Icon(Icons.swap_horiz_rounded),
