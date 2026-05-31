@@ -28,23 +28,27 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
     duration: const Duration(milliseconds: 260),
   );
 
+  bool _initializing = true;
+
   @override
   void initState() {
     super.initState();
+    AppLayoutSettings.tabletMode.addListener(_handleModeChanged);
     // 等待第一帧获取正确的屏幕宽度
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!AppLayoutSettings.hasUserSet) {
         final width = MediaQuery.sizeOf(context).width;
         if (width > 600) {
-          AppLayoutSettings.tabletMode.value = true;
+          // 直接设置值，不触发动画
           _controller.value = 1;
+          AppLayoutSettings.tabletMode.value = true;
         }
       } else if (AppLayoutSettings.tabletMode.value) {
         _controller.value = 1;
       }
+      _initializing = false;
     });
-    AppLayoutSettings.tabletMode.addListener(_handleModeChanged);
   }
 
   @override
@@ -55,7 +59,7 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
   }
 
   void _handleModeChanged() {
-    if (!mounted) return;
+    if (!mounted || _initializing) return;
     final enabled = AppLayoutSettings.tabletMode.value;
     if (enabled) {
       // 确保动画开始时布局与手机模式一致

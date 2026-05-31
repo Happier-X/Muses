@@ -192,7 +192,7 @@ class AppPageScaffoldState extends State<AppPageScaffold>
         );
 
         if (tabletMode || !_hasDrawer) {
-          return AppBackground(child: page);
+          return page;
         }
         final stack = AppBackground(
           child: Stack(
