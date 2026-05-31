@@ -909,37 +909,29 @@ class _SongsPageState extends State<SongsPage>
       useSafeArea: true,
       builder: (context) {
         return SortSheet(
-            options: const [
-              SortOption(
-                key: 'title',
-                label: '歌曲名称',
-                icon: Icons.sort_by_alpha,
-              ),
-              SortOption(
-                key: 'artist',
-                label: '歌手名称',
-                icon: Icons.person_outline,
-              ),
-              SortOption(
-                key: 'album',
-                label: '专辑名称',
-                icon: Icons.album_outlined,
-              ),
-              SortOption(key: 'duration', label: '歌曲时长', icon: Icons.schedule),
-            ],
-            currentKey: _sortKey.value,
-            ascending: _ascending.value,
-            onSelectKey: (value) {
-              _sortKey.value = value;
-              _rebuildVisibleSongs();
-              _saveViewPrefs();
-            },
-            onSelectAscending: (value) {
-              _ascending.value = value;
-              _rebuildVisibleSongs();
-              _saveViewPrefs();
-            },
-          );
+          options: const [
+            SortOption(key: 'title', label: '歌曲名称', icon: Icons.sort_by_alpha),
+            SortOption(
+              key: 'artist',
+              label: '歌手名称',
+              icon: Icons.person_outline,
+            ),
+            SortOption(key: 'album', label: '专辑名称', icon: Icons.album_outlined),
+            SortOption(key: 'duration', label: '歌曲时长', icon: Icons.schedule),
+          ],
+          currentKey: _sortKey.value,
+          ascending: _ascending.value,
+          onSelectKey: (value) {
+            _sortKey.value = value;
+            _rebuildVisibleSongs();
+            _saveViewPrefs();
+          },
+          onSelectAscending: (value) {
+            _ascending.value = value;
+            _rebuildVisibleSongs();
+            _saveViewPrefs();
+          },
+        );
       },
     );
   }
@@ -1045,7 +1037,7 @@ class _SongsPageState extends State<SongsPage>
             showMiniPlayer: !_multiSelect.value,
             appBar: AppTopBar(
               title: '歌曲',
-              centerTitle: !isTabletLandscape,
+              centerTitle: true,
               leading: IconButton(
                 icon: const Icon(Icons.menu_rounded),
                 onPressed: _openDrawer,
