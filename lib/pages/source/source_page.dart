@@ -8,6 +8,7 @@ import '../../app/services/local_music_service.dart';
 import '../../app/services/db/dao/song_dao.dart';
 import '../../app/router/app_page_route.dart';
 import '../../app/services/webdav/webdav_music_service.dart';
+import '../../app/state/settings_state.dart';
 import '../../app/services/webdav/webdav_source_repository.dart';
 import '../../components/index.dart';
 import 'local/local_folder_browser.dart';
@@ -427,10 +428,12 @@ class _SourcePageState extends State<SourcePage> with SignalsMixin {
       extendBodyBehindAppBar: true,
       appBar: AppTopBar(
         title: '音源',
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
+        leading: AppLayoutSettings.tabletMode.value
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
         actions: [
           IconButton(icon: const Icon(Icons.add), onPressed: _openWebDavAdd),
         ],

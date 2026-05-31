@@ -27,10 +27,12 @@ class _SettingsPageState extends State<SettingsPage> {
       extendBodyBehindAppBar: true,
       appBar: AppTopBar(
         title: '设置',
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
+        leading: AppLayoutSettings.tabletMode.value
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),

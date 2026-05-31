@@ -8,6 +8,7 @@ import '../../app/services/db/dao/song_dao.dart';
 import '../../app/services/player_service.dart';
 import '../../app/services/playlists_service.dart';
 import '../../app/services/stats_service.dart';
+import '../../app/state/settings_state.dart';
 import '../../app/router/app_page_route.dart';
 import '../../app/state/song_state.dart';
 import '../../app/utils/cache_version_store.dart';
@@ -312,10 +313,12 @@ class _PlaylistsPageState extends State<PlaylistsPage>
       extendBodyBehindAppBar: true,
       appBar: AppTopBar(
         title: '歌单',
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: _openDrawer,
-        ),
+        leading: AppLayoutSettings.tabletMode.value
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.menu_rounded),
+                onPressed: _openDrawer,
+              ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
