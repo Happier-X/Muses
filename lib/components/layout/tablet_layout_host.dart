@@ -31,9 +31,19 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
   @override
   void initState() {
     super.initState();
-    if (AppLayoutSettings.tabletMode.value) {
-      _controller.value = 1;
-    }
+    // 等待第一帧获取正确的屏幕宽度
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!AppLayoutSettings.hasUserSet) {
+        final width = MediaQuery.sizeOf(context).width;
+        if (width > 600) {
+          AppLayoutSettings.tabletMode.value = true;
+          _controller.value = 1;
+        }
+      } else if (AppLayoutSettings.tabletMode.value) {
+        _controller.value = 1;
+      }
+    });
     AppLayoutSettings.tabletMode.addListener(_handleModeChanged);
   }
 
@@ -48,6 +58,8 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
     if (!mounted) return;
     final enabled = AppLayoutSettings.tabletMode.value;
     if (enabled) {
+      // 确保动画开始时布局与手机模式一致
+      _controller.value = 0;
       _controller.forward();
     } else {
       _controller.reverse();
@@ -125,12 +137,10 @@ class _TabletLayoutHostState extends State<TabletLayoutHost>
                   width: drawerWidth,
                   child: IgnorePointer(
                     ignoring: t == 0,
-                    child: SideMenu(
-                      onNavigate: _handleNavigate,
-                    ),
+                    child: SideMenu(onNavigate: _handleNavigate),
                   ),
                 ),
-                if (AppLayoutSettings.tabletMode.value)
+                if (t > 0)
                   Positioned(
                     left: 0,
                     right: 0,
