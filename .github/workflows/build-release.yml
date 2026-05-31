@@ -69,15 +69,9 @@ jobs:
           done
       - name: Extract changelog for current version
         run: |
-          # Extract content between current version header and previous version header
-          awk -v version="$VERSION" '
-            /^## \[/ {
-              if (found) exit
-              if ($0 ~ "\\[" version "\\]") found=1
-              next
-            }
-            found { print }
-          ' CHANGELOG.md > release_notes.txt
+          # Extract content for current version using sed
+          # 1. Find version header, 2. Delete everything before it, 3. Delete from next version header onwards
+          sed -n "/^## \[$VERSION\]/,/^## \[/p" CHANGELOG.md | sed '1d;$ { /^## \[/d; }' > release_notes.txt
           
           # Fallback if no changelog entry found
           if [ ! -s release_notes.txt ]; then
