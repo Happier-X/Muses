@@ -19,8 +19,6 @@ class AppLayoutSettings {
     _hasUserSet = prefs.getBool(_prefsUserSetTabletMode) ?? false;
     if (_hasUserSet) {
       tabletMode.value = prefs.getBool(_prefsTabletMode) ?? false;
-    } else {
-      tabletMode.value = false;
     }
   }
 
