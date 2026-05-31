@@ -22,107 +22,112 @@ class SideMenu extends StatelessWidget {
 
     return Material(
       color: Colors.transparent,
-      child: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(
-              overlayColor,
-              baseColor.withValues(
-                alpha: theme.hasAmbientBackground ? 0.14 : 0.92,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            overlayColor,
+            baseColor.withValues(
+              alpha: theme.hasAmbientBackground ? 0.14 : 0.92,
+            ),
+          ),
+          border: Border(right: BorderSide(color: borderColor)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 36, 24, 16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.12),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.asset('开发文档/logo.png', fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    'Muses',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
-            border: Border(right: BorderSide(color: borderColor)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 36, 24, 16),
-                child: Row(
+            const SizedBox(height: 10),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 100),
+                child: Column(
                   children: [
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.12),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: Image.asset(
-                        '开发文档/logo.png',
-                        fit: BoxFit.cover,
-                      ),
+                    _buildMenuItem(
+                      context,
+                      Icons.music_note_rounded,
+                      '歌曲',
+                      () => _navigateAndClose(context, AppRoutes.songs),
                     ),
-                    const SizedBox(width: 16),
-                    Text(
-                      'Muses',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                    _buildMenuItem(
+                      context,
+                      Icons.album_rounded,
+                      '专辑',
+                      () => _navigateAndClose(context, AppRoutes.albums),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      Icons.people_rounded,
+                      '艺术家',
+                      () => _navigateAndClose(context, AppRoutes.artists),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      Icons.queue_music_rounded,
+                      '歌单',
+                      () => _navigateAndClose(context, AppRoutes.playlists),
+                    ),
+                    const SizedBox(height: 8),
+                    Divider(
+                      height: 1,
+                      thickness: 0.6,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+                      indent: 12,
+                      endIndent: 12,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildMenuItem(
+                      context,
+                      Icons.radar_rounded,
+                      '音源',
+                      () => _navigateAndClose(context, AppRoutes.source),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      Icons.bar_chart_rounded,
+                      '统计',
+                      () =>
+                          _navigateAndClose(context, AppRoutes.listeningStats),
+                    ),
+                    _buildMenuItem(
+                      context,
+                      Icons.settings_rounded,
+                      '设置',
+                      () => _navigateAndClose(context, AppRoutes.settings),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 100),
-                  child: Column(
-                    children: [
-                      _buildMenuItem(
-                        context,
-                        Icons.music_note_rounded,
-                        '歌曲',
-                        () => _navigateAndClose(context, AppRoutes.songs),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.album_rounded,
-                        '专辑',
-                        () => _navigateAndClose(context, AppRoutes.albums),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.people_rounded,
-                        '艺术家',
-                        () => _navigateAndClose(context, AppRoutes.artists),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.queue_music_rounded,
-                        '歌单',
-                        () => _navigateAndClose(context, AppRoutes.playlists),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.radar_rounded,
-                        '音源',
-                        () => _navigateAndClose(context, AppRoutes.source),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.bar_chart_rounded,
-                        '统计',
-                        () => _navigateAndClose(context, AppRoutes.listeningStats),
-                      ),
-                      _buildMenuItem(
-                        context,
-                        Icons.settings_rounded,
-                        '设置',
-                        () => _navigateAndClose(context, AppRoutes.settings),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
