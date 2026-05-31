@@ -95,15 +95,6 @@ class SideMenu extends StatelessWidget {
                       '歌单',
                       () => _navigateAndClose(context, AppRoutes.playlists),
                     ),
-                    const SizedBox(height: 8),
-                    Divider(
-                      height: 1,
-                      thickness: 0.6,
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.25),
-                      indent: 12,
-                      endIndent: 12,
-                    ),
-                    const SizedBox(height: 8),
                     _buildMenuItem(
                       context,
                       Icons.radar_rounded,
