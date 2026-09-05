@@ -28,14 +28,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowState
+import androidx.compose.runtime.CompositionLocalProvider
+import com.muses.player.core.ui.theme.LocalHazeBlurState
 import com.muses.player.core.ui.theme.SaltTheme
+import com.muses.player.core.uishared.platform.DesktopToastOverlay
 import com.muses.player.desktop.playback.DesktopPlayerHook
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
+import org.koin.compose.KoinApplication
 
 /**
  * 桌面主界面（S3b）：标题栏 + 平板双栏（侧边导航 + 内容区）。
  * 桌面宽度默认 1280dp，天然落在平板断点（>=768dp）之上。
  *
  * U5 曲目列表共用化：包裹 SaltTheme 使共享组件可正确取色。
+ * U9 曲库共用化：顶层挂 Koin（desktopAppModules），共享 ViewModel 经 koinViewModel() 注入。
+ * U2 桌面真模糊：创建 HazeState 并 provide LocalHazeBlurState（Any? 擦除桥接，
+ * 与安卓 TabsLayout 同模式）；内容区 hazeSource 标记取样层，共享组件的
+ * SaltNavbar/MiniPlayerBar 等经 platformBlurModifier 获得真磨砂。
  */
 @Composable
 fun MusesDesktopApp(
@@ -45,27 +55,40 @@ fun MusesDesktopApp(
     playerHook: DesktopPlayerHook? = null,
 ) {
     val destination by viewModel.destination.collectAsState()
+    val hazeState = rememberHazeState()
 
-    SaltTheme {
-        Column(modifier = Modifier.fillMaxSize().background(Color(0xFF11111B))) {
-            DesktopTitleBar(
-                windowState = windowState,
-                onClose = onClose,
-            )
-            Row(modifier = Modifier.fillMaxSize()) {
-                // 侧边导航（TabletLayout 双栏：260px 侧边栏）
-                DesktopSidebar(
-                    current = destination,
-                    onNavigate = viewModel::navigate,
-                )
-                // 内容区
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    when (destination) {
-                        DesktopDestination.LIBRARY -> LibraryScreen(playerHook = playerHook)
-                        DesktopDestination.PLAYER -> PlayerScreen(playerHook = playerHook)
-                        DesktopDestination.SOURCES -> SourceManagerScreen()
-                        DesktopDestination.SCRAPE -> ScrapeScreen()
-                        DesktopDestination.SETTINGS -> SettingsScreen()
+    KoinApplication(application = { modules(desktopAppModules) }) {
+        CompositionLocalProvider(LocalHazeBlurState provides hazeState) {
+            SaltTheme {
+                // Box 承载内容 + Toast 浮层（U2：桌面 PlatformToast 经 DesktopToastOverlay 渲染）
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF11111B))) {
+                        DesktopTitleBar(
+                            windowState = windowState,
+                            onClose = onClose,
+                        )
+                        Row(modifier = Modifier.fillMaxSize()) {
+                            // 侧边导航（TabletLayout 双栏：260px 侧边栏）
+                            DesktopSidebar(
+                                current = destination,
+                                onNavigate = viewModel::navigate,
+                            )
+                            // 内容区（hazeSource：作为模糊取样层，磨砂导航条读取其下内容）
+                            Box(
+                                modifier = Modifier.weight(1f).fillMaxHeight()
+                                    .hazeSource(state = hazeState),
+                            ) {
+                                when (destination) {
+                                    DesktopDestination.LIBRARY -> LibraryScreen(playerHook = playerHook)
+                                    DesktopDestination.PLAYER -> PlayerScreen(playerHook = playerHook)
+                                    DesktopDestination.SOURCES -> SourceManagerScreen()
+                                    DesktopDestination.SCRAPE -> ScrapeScreen()
+                                    DesktopDestination.SETTINGS -> SettingsScreen()
+                                }
+                            }
+                        }
+                        // U2：桌面 Toast 浮层（消费 PlatformToast 总线，覆盖于内容之上、不拦截点击）
+                        DesktopToastOverlay()
                     }
                 }
             }

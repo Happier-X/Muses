@@ -327,7 +327,8 @@ private fun AppNavHost(navController: NavHostController) {
             AlbumDetailScreen(
                 albumId = albumId,
                 onBack = { navController.popBackStack() },
-                playerConnection = playerConnection,
+                // U9：播放连接经回调注入（详情屏已上收 commonMain，不再依赖 core:media）
+                onPlaySong = { songId, songs -> playerConnection.play(songId, songs) },
             )
         }
         composable(DetailRoutes.ARTIST_DETAIL) { backStackEntry ->
@@ -336,7 +337,7 @@ private fun AppNavHost(navController: NavHostController) {
             ArtistDetailScreen(
                 artistId = artistId,
                 onBack = { navController.popBackStack() },
-                playerConnection = playerConnection,
+                onPlaySong = { songId, songs -> playerConnection.play(songId, songs) },
             )
         }
         composable(NavDestination.Playlists.route) {

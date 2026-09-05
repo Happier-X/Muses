@@ -32,14 +32,15 @@ kotlin {
             implementation(libs.tabler.filled.icons.cmp)
             // Coil 3（KMP 图片加载；commonMain 提供 AsyncImage API）
             implementation(libs.coil.compose)
-            // Haze 公共类型（KMP：HazeState / HazeInput 等跨平台类型；不含 Android-only blur modifier）
+            // Haze（U2 纠偏：2.0 起为 KMP 工件——android/jvm 等变体已发布，Gradle 按 target 解析；
+            // 原「Android only」注释过时）。commonMain 声明使 androidMain/jvmMain actual 均可引用真模糊 API
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
+            // Haze 公共类型（KMP：HazeState / HazeInput 等跨平台类型）
             implementation(libs.haze.utils)
         }
 
         androidMain.dependencies {
-            // PlatformBlur：Haze 真模糊（U3 T1 组件层消费；此处声明让 androidMain actual 可引用）
-            implementation(libs.haze)
-            implementation(libs.haze.blur)
             // Coil 3 网络引擎（okhttp 实现；不加则 AsyncImage 加载 https 静默失败）
             implementation(libs.coil.network.okhttp)
         }

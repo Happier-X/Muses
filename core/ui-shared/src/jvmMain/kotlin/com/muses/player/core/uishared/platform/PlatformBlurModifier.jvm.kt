@@ -5,13 +5,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.muses.player.core.ui.theme.HazeBlurStyleData
+import dev.chrisbanes.haze.HazeInput
+import dev.chrisbanes.haze.blur.HazeBlurStyle
+import dev.chrisbanes.haze.blur.HazeColorEffect
+import dev.chrisbanes.haze.blur.hazeBlur
 
 /**
- * JVM actual（桌面）：无真模糊，纯色降级。
- *
- * - 桌面端不引入 Haze 依赖，模糊效果由 [backgroundColor] 半透明背景替代；
- * - hazeState / hazeStyleData 参数在桌面端忽略（签名保持跨平台一致）。
+ * U2 jvmMain（桌面）actual：Haze 真模糊（Skia）。
+ * 与安卓 actual 同构——haze 2.0 KMP 统一 API（HazeInput/HazeBlurStyle/hazeBlur）双端一致；
+ * [hazeState] 为 null（桌面壳未提供）时回退半透明纯色背景。
  */
 @Composable
 @ReadOnlyComposable
@@ -21,5 +25,22 @@ actual fun platformBlurModifier(
     hazeState: Any?,
     hazeStyleData: HazeBlurStyleData?,
 ): Modifier {
-    return Modifier.background(color = backgroundColor)
+    // 类型擦除桥接：commonMain 传入 Any?，桌面 actual 转为 HazeState
+    @Suppress("UNCHECKED_CAST")
+    val hzState = hazeState as? dev.chrisbanes.haze.HazeState
+
+    return if (hzState != null && hazeStyleData != null) {
+        // 将跨平台风格数据转换为 HazeBlurStyle
+        val hazeStyle = HazeBlurStyle(
+            backgroundColor = hazeStyleData.backgroundColor,
+            colorEffects = listOf(
+                HazeColorEffect.tint(hazeStyleData.tint),
+            ),
+            blurRadius = hazeStyleData.blurRadiusDp.dp,
+            noiseFactor = 0.01f,
+        )
+        Modifier.hazeBlur(input = HazeInput.Sources(hzState), style = hazeStyle)
+    } else {
+        Modifier.background(color = backgroundColor)
+    }
 }

@@ -19,6 +19,19 @@ kotlin {
             // :desktop 用 implementation 不透传 :core:common，composeApp 需直接依赖
             api(project(":core:common"))
             implementation(project(":core:ui-shared"))
+            // U11：desktopAppModules 引用 webdavCoreModule（feature:sources 对 webdav 为 implementation 不透传）
+            implementation(project(":core:webdav"))
+            // U2 桌面真模糊：壳层创建 HazeState 并对内容标记 hazeSource（消费层在 ui-shared）
+            implementation(libs.haze)
+            // U9 曲库共用化：桌面直接复用 :feature:library commonMain 的 Screen/ViewModel
+            implementation(project(":feature:library"))
+            // U11 音源共用化：桌面复用共享 WebDAV 浏览页（:feature:sources commonMain）
+            implementation(project(":feature:sources"))
+            // 共享 ViewModel 经 Koin 注入（koinViewModel() 在 compose-viewmodel，KMP 工件；
+            // KMP sourceSets 不支持 platform(BOM)，toml 已显式挂 4.2.0）
+            implementation(libs.koin.core)
+            implementation(libs.koin.compose)
+            implementation(libs.koin.compose.viewmodel)
             // Room/SQLite/DataStore/JNA 不透传，桌面直接调用 DAO 时需显式声明
             implementation(libs.room.runtime)
             implementation(libs.sqlite.bundled)
