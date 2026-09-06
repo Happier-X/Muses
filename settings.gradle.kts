@@ -26,7 +26,7 @@ rootProject.name = "muses-native"
 
 include(":app")
 include(":core:common")
-include(":core:ui")
+// U24：:core:ui 空壳透传模块删除（U1 T0 起组件全在 :core:ui-shared，消费方直连）
 // U0 地基（09-04-kmp-ui-shared）：KMP 界面共享模块
 include(":core:ui-shared")
 include(":core:data")

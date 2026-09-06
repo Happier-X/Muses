@@ -59,7 +59,7 @@ dependencies {
     // 模块依赖：app 聚合全部 core/feature
     implementation(project(":core:common"))
     implementation(project(":feature:scrape"))
-    implementation(project(":core:ui"))
+    // U24：:core:ui 空壳删除，消费方直连 :core:ui-shared
     implementation(project(":core:ui-shared"))
     implementation(project(":core:data"))
     implementation(project(":core:webdav"))
@@ -78,13 +78,11 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
 
-    // Compose
+    // Compose（U24：app 无自有 UI，仅 MainActivity setContent 壳需要 runtime/ui 基线；
+    // SaltTheme/组件经 :core:ui-shared 与 :feature:shell 提供）
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
-    implementation(libs.compose.ui.graphics)
     implementation(libs.compose.material3)
-    implementation(libs.compose.ui.tooling.preview)
-    debugImplementation(libs.compose.ui.tooling)
 
     // P2a Koin（BOM 统一 4.2.0，无散装版本号）
     implementation(platform(libs.koin.bom))
@@ -95,14 +93,7 @@ dependencies {
     // WorkManager（ScanWorker 为 KoinComponent 懒注入，见 P2a R3）
     implementation(libs.work.runtime.ktx)
 
-    // 真磨砂：TabsLayout 的 hazeSource / hazeEffect 需在 app 模块可见
-    implementation(libs.haze)
-    implementation(libs.haze.blur)
-
-    // Coil 3（封面加载，阶段 1+ 实际使用）
-    implementation(libs.coil.compose)
-
-    // jaudiotagger（音频标签读取）
+    // jaudiotagger（MusesApplication 启动期 TagOptionSingleton.setAndroid(true) 强制安卓分支）
     implementation(libs.jaudiotagger)
 
     testImplementation(libs.junit)
