@@ -75,7 +75,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.navigation.compose)
+    // U18：CMP Navigation 试点——与 androidx.navigation.compose API 同构，android 变体委托 androidx 构件
+    implementation(libs.jetbrains.navigation.compose)
 
     // Compose
     implementation(platform(libs.compose.bom))
