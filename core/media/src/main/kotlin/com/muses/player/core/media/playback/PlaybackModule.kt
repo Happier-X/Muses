@@ -4,7 +4,6 @@ import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import com.muses.player.core.media.scanner.LocalLibraryScanner
-import com.muses.player.core.media.scanner.WebDavLibraryScanner
 import java.io.File
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.singleOf
@@ -24,7 +23,7 @@ val playbackModule = module {
     // U12：端口绑定——commonMain 的 PlayerViewModel 经 PlaybackPort 消费（P1 驱动面 + U12 UI 全量面）
     single<com.muses.player.core.playback.PlaybackPort> { get<PlayerConnection>() }
     singleOf(::LocalLibraryScanner)
-    singleOf(::WebDavLibraryScanner)
+    // U25：WebDavLibraryScanner 上收 :core:common jvmShared，绑定归 webdavCoreModule（双端共用），此处不再重复声明
 
     /**
      * Media3 SimpleCache 单例：进程内同目录只允许一个实例。

@@ -1,12 +1,9 @@
 package com.muses.player.core.media.scanner
 
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import com.muses.player.core.data.log.ErrorLogStore
 import com.muses.player.core.data.repository.CredentialsRepository
 import com.muses.player.core.model.Source
 import com.muses.player.core.model.SourceType
-import com.muses.player.core.webdav.WebDavAudioCache
 import com.muses.player.core.webdav.WebDavClient
 import com.muses.player.core.webdav.WebDavItem
 import kotlinx.coroutines.test.runTest
@@ -15,27 +12,21 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 /**
- * WebDavLibraryScanner 单测（fake 注入 WebDavClient / CredentialsRepository）。
+ * WebDavLibraryScanner 单测（U25 自 :core:media 上收至 :core:common jvmShared，随源码迁移至
+ * jvmTest 纯 JVM 测试；fake 注入 WebDavClient / CredentialsRepository）。
  * 扫描器为纯发现+文件名建库（标签由播放懒扫描负责），覆盖：
  * 扩展名过滤+递归 / 零下载 / 密码缺失抛错且进度置终态 / 文件名建库 tagsVersion=0。
  */
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34])
 class WebDavLibraryScannerTest {
 
-    private lateinit var context: Context
     private lateinit var client: FakeWebDavClient
     private lateinit var credentials: FakeCredentialsRepository
     private lateinit var scanner: WebDavLibraryScanner
 
     @Before
     fun setUp() {
-        context = ApplicationProvider.getApplicationContext()
         client = FakeWebDavClient()
         credentials = FakeCredentialsRepository(password = "secret")
         scanner = WebDavLibraryScanner(client, credentials, FakeErrorLogStore())
@@ -83,9 +74,9 @@ class WebDavLibraryScannerTest {
         assertTrue(songs.all { it.tagsVersion == WebDavLibraryScanner.FILENAME_TAGS_VERSION })
         assertTrue(songs.all { it.durationMs == 0L })
         assertTrue(songs.all { it.coverUri == null })
-        // 稳定 ID 与 LocalLibraryScanner.stableSongId 同源
+        // 稳定 ID 与上收后的伴生 stableSongId 同源
         assertEquals(
-            LocalLibraryScanner.stableSongId("src-1", songs[0].path),
+            WebDavLibraryScanner.stableSongId("src-1", songs[0].path),
             songs[0].id,
         )
         // 进度终态

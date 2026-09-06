@@ -1,5 +1,6 @@
 package com.muses.player.core.media.scanner
 
+import com.muses.player.core.data.db.SongTags
 import com.muses.player.core.data.log.ErrorLogStore
 import com.muses.player.core.data.repository.CredentialsRepository
 import com.muses.player.core.model.Song
@@ -7,6 +8,7 @@ import com.muses.player.core.model.Source
 import com.muses.player.core.model.SourceType
 import com.muses.player.core.webdav.WebDavClient
 import com.muses.player.core.webdav.WebDavItem
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 /**
- * WebDAV 库扫描器（纯发现 + 文件名建库）。
+ * WebDAV 库扫描器（纯发现 + 文件名建库；U25 上收自 :core:media，android/desktop 双端共用）。
  *
  * - 发现阶段：从 `source.url + source.path` 起 BFS 递归 PROPFIND（复用 [WebDavClient.list]），
  *   按扩展名过滤支持的音频格式；进度 total=0、currentFile=正在列的目录（UI 映射「正在查找文件」）；
@@ -77,7 +79,7 @@ class WebDavLibraryScanner constructor(
             for (item in webDavClient.list(directory)) {
                 if (item.isDirectory) {
                     queue.add(item.url)
-                } else if (LocalLibraryScanner.isSupportedAudio(item.name)) {
+                } else if (isSupportedAudio(item.name)) {
                     files.add(item)
                 }
             }
@@ -87,7 +89,7 @@ class WebDavLibraryScanner constructor(
 
     /** 文件名建歌：标题=displayName 去扩展名，零标签零下载；tagsVersion=0 表示「尚未读过标签」（播放时懒扫描补齐） */
     private fun filenameSong(sourceId: String, item: WebDavItem): Song = Song(
-        id = LocalLibraryScanner.stableSongId(sourceId, item.url),
+        id = stableSongId(sourceId, item.url),
         sourceId = sourceId,
         path = item.url,
         title = item.name.substringBeforeLast('.'),
@@ -97,15 +99,14 @@ class WebDavLibraryScanner constructor(
 
     /** 同目录同名 .lrc 的完整 URL（供播放懒扫描使用；移植自旧工程 WebDavPlugin.buildSidecarLyricsUrl） */
     fun buildSidecarLyricsUrl(audioUrl: String): String? = runCatching {
-        val uri = android.net.Uri.parse(audioUrl)
-        val lastSegment = uri.lastPathSegment ?: return null
-        val lyricSegment = lastSegment.substringBeforeLast('.', lastSegment) + ".lrc"
-        uri.buildUpon()
-            .path(uri.path.orEmpty().substringBeforeLast('/') + "/" + lyricSegment)
-            .query(null)
-            .fragment(null)
-            .build()
-            .toString()
+        // U25 上收：android.net.Uri → 纯字符串（只改 path 末段扩展名，去 query/fragment；
+        // java.net.URI 多参数构造器会对已编码 %XX 先解码再编码，与安卓 Uri.buildUpon().path() 原样语义不一致）
+        val noQuery = audioUrl.substringBefore('#').substringBefore('?')
+        val slash = noQuery.lastIndexOf('/')
+        if (slash < 0) return null
+        val last = noQuery.substring(slash + 1)
+        if (last.isEmpty()) return null
+        noQuery.substring(0, slash + 1) + last.substringBeforeLast('.', last) + ".lrc"
     }.getOrNull()
 
     private fun joinUrl(baseUrl: String, path: String?): String {
@@ -115,12 +116,31 @@ class WebDavLibraryScanner constructor(
     }
 
     companion object {
-        const val TAGS_VERSION = LocalLibraryScanner.TAGS_VERSION
+        const val TAGS_VERSION = SongTags.TAGS_VERSION
 
         /** 文件名建库的 tagsVersion 占位（< TAGS_VERSION 即待懒扫描） */
         const val FILENAME_TAGS_VERSION = 0
 
         /** 密码缺失报错文案（对齐 Web src/features/library/scanner.ts） */
         const val PASSWORD_MISSING_MESSAGE = "WebDAV 密码不存在，请重新添加该音源。"
+
+        /** 稳定歌曲 ID：sourceId + 文件路径哈希（U25 上收：原 LocalLibraryScanner.stableSongId，经 CoverCacheWriter.sha256） */
+        fun stableSongId(sourceId: String, filePath: String): String =
+            sha256("$sourceId|$filePath")
+
+        /** 音频扩展名过滤（U25 上收：原 LocalLibraryScanner.isSupportedAudio，集合冻结） */
+        fun isSupportedAudio(pathOrName: String): Boolean {
+            val extension = pathOrName.substringAfterLast('.', "").lowercase()
+            return extension in SUPPORTED_AUDIO_EXTENSIONS
+        }
+
+        private val SUPPORTED_AUDIO_EXTENSIONS = setOf(
+            "aac", "aiff", "alac", "ape", "flac", "m4a", "m4b", "mp3", "ogg", "opus", "wav", "wma",
+        )
+
+        private fun sha256(value: String): String =
+            MessageDigest.getInstance("SHA-256")
+                .digest(value.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
     }
 }

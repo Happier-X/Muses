@@ -64,22 +64,39 @@ object DesktopRuntime {
 }
 
 /**
- * U23：桌面曲库扫描端口占位——桌面暂无 MediaStore/WebDAV 扫描栈（:core:media 安卓专属），
- * 共享音源页经 sourcesCoreModule 解析 SourcesViewModel 时需要本绑定；扫描返回空列表
- * （UI 汇总「共 0 首」），删源/编辑/WebDAV 表单全链路不受影响。
+ * U23 桌面曲库扫描端口：WebDAV 走上收至 :core:common jvmShared 的真扫描器
+ *（[WebDavLibraryScanner]，与安卓同实现：BFS 递归 PROPFIND + 文件名建库，零下载）；
+ * 本地目录扫描桌面暂无能力（MediaStore 为安卓专属），LOCAL 类型仍返回空列表。
+ *
+ * 进度约定：真扫描器 scan 内自行管理进度流（开始重置、结束推 finished=true）；
+ * 占位分支（LOCAL）同样先重置再推终态，否则扫描进度弹窗会卡在「正在查找文件」关不掉。
  */
-object DesktopLibraryScanPort : com.muses.player.feature.sources.LibraryScanPort {
-    private val idle = kotlinx.coroutines.flow.MutableStateFlow(
+class DesktopLibraryScanPort(
+    private val webDavScanner: com.muses.player.core.media.scanner.WebDavLibraryScanner,
+) : com.muses.player.feature.sources.LibraryScanPort {
+
+    private val localIdle = kotlinx.coroutines.flow.MutableStateFlow(
         com.muses.player.core.media.scanner.ScanProgress(),
     )
 
     override fun progressFor(type: com.muses.player.core.model.SourceType) =
-        idle as kotlinx.coroutines.flow.Flow<com.muses.player.core.media.scanner.ScanProgress>
+        if (type == com.muses.player.core.model.SourceType.WEBDAV) {
+            webDavScanner.scanProgress
+        } else {
+            localIdle as kotlinx.coroutines.flow.Flow<com.muses.player.core.media.scanner.ScanProgress>
+        }
 
     override suspend fun scan(
         source: com.muses.player.core.model.Source,
         readTags: Boolean,
-    ): List<com.muses.player.core.model.Song> = emptyList()
+    ): List<com.muses.player.core.model.Song> {
+        if (source.type == com.muses.player.core.model.SourceType.WEBDAV) {
+            return webDavScanner.scan(source)
+        }
+        localIdle.value = com.muses.player.core.media.scanner.ScanProgress()
+        localIdle.value = com.muses.player.core.media.scanner.ScanProgress(finished = true)
+        return emptyList()
+    }
 }
 
 /**
@@ -118,7 +135,7 @@ fun desktopLibraryModule(): Module = module {
     }
     single { com.muses.player.core.data.repository.PlaybackStateRepository(get()) }
     single { com.muses.player.core.data.repository.RecentPlaysRepository(get()) }
-    single<com.muses.player.feature.sources.LibraryScanPort> { DesktopLibraryScanPort }
+    single<com.muses.player.feature.sources.LibraryScanPort> { DesktopLibraryScanPort(get()) }
     single<com.muses.player.feature.shell.platform.AppVersionProvider> {
         object : com.muses.player.feature.shell.platform.AppVersionProvider {
             override val versionName: String = DesktopRuntime.appVersion()
