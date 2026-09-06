@@ -69,6 +69,8 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
+            // Dispatchers.Main 在桌面 JVM 靠 swing dispatcher 提供（CMP 1.12 起不传递，见 toml 同条目注释）
+            implementation(libs.kotlinx.coroutines.swing)
             // W4 桌面装配（任务 09-05-scrape-kmp）：JaudiotaggerTagPort 在 :core:common jvmShared，
             // 其 jaudiotagger 依赖为 implementation 作用域不透传，桌面消费 TagPort 需显式声明（同版本线）
             implementation(libs.jaudiotagger)

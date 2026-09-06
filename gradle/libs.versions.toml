@@ -109,6 +109,8 @@ datastore-preferences = { group = "androidx.datastore", name = "datastore-prefer
 
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+# 桌面 Dispatchers.Main 提供者：CMP 1.12 起 compose.desktop.currentOs 不再传递 javafx dispatcher，须显式声明
+kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "coroutines" }
 
 jaudiotagger = { group = "net.jthink", name = "jaudiotagger", version.ref = "jaudiotagger" }
 
