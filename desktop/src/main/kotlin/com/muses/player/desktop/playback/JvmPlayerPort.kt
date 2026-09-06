@@ -65,9 +65,12 @@ class JvmPlayerPort(
     private val audioCache: DesktopWebDavAudioCache = DesktopWebDavAudioCache(),
     private val errorLog: (tag: String, msg: String, e: Throwable?) -> Unit = { _, _, _ -> },
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-    private val factoryProvider: () -> MediaPlayerFactory = {
-        MediaPlayerFactory("--no-video", "--aout=directsound")
-    },
+    private val factoryProvider: () -> MediaPlayerFactory = { defaultFactory() },
+    /**
+     * U26 播放懒扫描钩子：startPlayback 接受播放后触发（songId + 已落盘本地文件）。
+     * 调用方负责读标签 + 回写库；本端口只保证「播起来了才触发」，失败不阻塞播放。
+     */
+    private val onPlaybackStarted: (suspend (songId: String, localFile: java.io.File) -> Unit)? = null,
 ) : PlayerPort {
 
     /** 曲库解析出的播放引用（Song 实体的最小播放子集，避免桌面依赖 :core:data mapper）。 */
@@ -391,6 +394,17 @@ class JvmPlayerPort(
             onSongFailed(ref.id, DesktopPlaybackErrorCopy.DEFAULT_ERROR)
             return
         }
+        // U26 播放懒扫描：播起来了才触发（读标签 + 回写库由调用方承载，异常内部消化不阻塞播放）
+        onPlaybackStarted?.let { hook ->
+            val songId = ref.id
+            scope.launch {
+                runCatching { hook(songId, file) }
+                    .onFailure { e ->
+                        if (e is CancellationException) throw e
+                        errorLog("JvmPlayerPort", "懒扫描钩子失败 songId=$songId", e)
+                    }
+            }
+        }
         if (startPositionMs > 0L) {
             scope.launch {
                 delay(600)
@@ -536,8 +550,14 @@ class JvmPlayerPort(
         val f = try {
             factory ?: factoryProvider().also { factory = it }
         } catch (e: Exception) {
+            // VLC 原生库缺失（未装 VLC 且便携版不可用）是最常见原因：文案指明方向，不再只有日志
+            val hint = if (resolveVlcDir() == null) {
+                DesktopPlaybackErrorCopy.VLC_MISSING
+            } else {
+                DesktopPlaybackErrorCopy.DEFAULT_ERROR
+            }
             errorLog("JvmPlayerPort", "创建 VLCJ 工厂失败", e)
-            _playbackError.value = DesktopPlaybackErrorCopy.DEFAULT_ERROR
+            _playbackError.value = DesktopPlaybackErrorCopy.safeCopy(hint)
             return
         }
         val p = try {
@@ -773,10 +793,48 @@ class JvmPlayerPort(
 
     companion object {
         /**
+         * VLC 原生库目录解析（优先级从高到低）：
+         * 1. `MUSES_VLC_DIR` 环境变量 / `muses.vlc.dir` 系统属性（含 libvlc.dll 的目录）；
+         * 2. 仓库便携版 `spike-vlcj/vlc-portable/vlc-3.0.21`（开发期免安装）；
+         * 3. null = 交给 VLCJ/JNA 按系统路径自行发现（已安装 VLC 桌面版时）。
+         */
+        fun resolveVlcDir(): java.io.File? {
+            val explicit = System.getenv("MUSES_VLC_DIR")?.takeIf { it.isNotBlank() }
+                ?: System.getProperty("muses.vlc.dir")?.takeIf { it.isNotBlank() }
+            explicit?.let {
+                val dir = java.io.File(it)
+                if (java.io.File(dir, "libvlc.dll").exists()) return dir
+            }
+            // 仓库便携版：从工作目录向上找仓库根（gradle run 的 cwd 即仓库根；jar 运行时回退系统发现）
+            var cursor: java.io.File? = java.io.File(System.getProperty("user.dir") ?: ".").absoluteFile
+            repeat(6) {
+                val candidate = if (cursor != null) java.io.File(cursor, "spike-vlcj/vlc-portable/vlc-3.0.21") else null
+                if (candidate != null && java.io.File(candidate, "libvlc.dll").exists()) return candidate
+                cursor = cursor?.parentFile
+            }
+            return null
+        }
+
+        /**
+         * 默认 VLCJ 工厂：先解析原生库目录并设 `jna.library.path`（VLCJ 经 JNA 加载 libvlc），
+         * 再建 `--no-video --aout=directsound` 工厂。目录缺失时抛错由调用方记日志（不再静默）。
+         */
+        fun defaultFactory(): MediaPlayerFactory {
+            val vlcDir = resolveVlcDir()
+            if (vlcDir != null) {
+                System.setProperty("jna.library.path", vlcDir.absolutePath)
+            } else {
+                System.clearProperty("jna.library.path")
+            }
+            return MediaPlayerFactory("--no-video", "--aout=directsound")
+        }
+
+        /**
          * 默认装配：Room 单例（`<appDataDir>/muses.db`）+ DataStore 持久化 + JVM 缓存/日志目录。
          *
          * - DB：[createJvmDatabase] 单例（S1 底座，不在此重复建库）；
-         * - DataStore：[createDataStore] 真实路径（S1 底座）；
+         * - DataStore：调用方供给单例（同文件多实例会抛 multiple DataStores active；
+         *   桌面统一用 DesktopContainer.settingsStore，与凭据/设置/播放状态/最近播放共享）；
          * - 缓存：[PlatformDirs.cacheDir] okio spiller 语义由 [DesktopWebDavAudioCache] 承载；
          * - 崩溃日志：[PlatformDirs.errorLogDir]/crash-latest.txt（见 [DesktopErrorLog]）。
          *
@@ -792,8 +850,10 @@ class JvmPlayerPort(
                 DesktopErrorLog.log(tag, msg, e)
             },
             scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            onPlaybackStarted: (suspend (songId: String, localFile: java.io.File) -> Unit)? = null,
+            dataStore: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> =
+                com.muses.player.core.data.store.createDataStore(),
         ): JvmPlayerPort {
-            val dataStore = createDataStore()
             return JvmPlayerPort(
                 songLookup = songLookup,
                 sourceLookup = sourceLookup,
@@ -803,6 +863,7 @@ class JvmPlayerPort(
                 audioCache = audioCache,
                 errorLog = errorLog,
                 scope = scope,
+                onPlaybackStarted = onPlaybackStarted,
             )
         }
     }

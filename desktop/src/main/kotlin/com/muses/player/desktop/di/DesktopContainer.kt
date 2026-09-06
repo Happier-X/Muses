@@ -3,9 +3,15 @@ package com.muses.player.desktop.di
 import com.muses.player.core.data.crypto.PlatformCryptoEngine
 import com.muses.player.core.data.db.MusesDatabase
 import com.muses.player.core.data.db.createJvmDatabase
+import com.muses.player.core.data.mapper.toDomain
 import com.muses.player.core.data.platform.PlatformDirs
 import com.muses.player.core.data.repository.CredentialsRepository
+import com.muses.player.core.data.repository.RoomAlbumRepository
+import com.muses.player.core.data.repository.RoomArtistRepository
+import com.muses.player.core.data.repository.RoomSongRepository
+import com.muses.player.core.media.scanner.PlaybackLazyScan
 import com.muses.player.core.model.SourceType
+import com.muses.player.core.scrape.ports.JaudiotaggerTagPort
 import com.muses.player.desktop.cache.DesktopWebDavAudioCache
 import com.muses.player.desktop.playback.DesktopErrorLog
 import com.muses.player.desktop.playback.JvmPlayerPort
@@ -78,11 +84,52 @@ object DesktopContainer {
                 JvmPlayerPort.SourceRef(id = e.id, url = e.url, username = e.username)
             }
         }
+        // U26 播放懒扫描：读本地已缓存文件标签（JaudiotaggerTagPort）→ 共用编排融合 →
+        // RoomSongRepository.upsert 回写（与安卓 PlaybackService 同契约：已刮削字段保护 + tagsVersion 抬升）
+        val songRepository = RoomSongRepository(db.songDao(), db.albumDao(), db.artistDao())
+        val lazyScan: suspend (String, java.io.File) -> Unit = { songId, localFile ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    val song = songRepository.getSong(songId) ?: return@withContext
+                    val tags = JaudiotaggerTagPort.readTags(localFile)
+                    val coverUri = tags?.cover?.takeIf { it.isNotEmpty() }?.let { bytes ->
+                        writeLazyScanCover(songId, bytes)
+                    }
+                    val merged = PlaybackLazyScan.merge(
+                        song,
+                        tags?.let {
+                            PlaybackLazyScan.FileTags(
+                                title = it.title,
+                                artist = it.artist,
+                                album = it.album,
+                                lyrics = it.lyrics,
+                                coverUri = coverUri,
+                                durationMs = it.durationMs,
+                            )
+                        },
+                    )
+                    if (merged != null) songRepository.upsert(merged)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // 静默失败保持 tagsVersion=0 下次重试，不阻塞播放
+                    com.muses.player.desktop.playback.DesktopErrorLog.log(
+                        "PlaybackLazyScan",
+                        "懒扫描失败 id=$songId path=${localFile.path.take(80)}: ${e.message}",
+                        e,
+                    )
+                }
+            }
+        }
         return JvmPlayerPort.createDefault(
             db = db,
             songLookup = songLookup ?: defaultSongLookup,
             sourceLookup = sourceLookup ?: defaultSourceLookup,
             passwordLookup = passwordLookup ?: { sourceId -> credentials.getPassword(sourceId) },
+            onPlaybackStarted = lazyScan,
+            // 同文件多 DataStore 实例会抛 multiple DataStores active：复用进程单例，
+            // 与 DesktopCredentials（凭据）/Koin 设置仓储/播放状态共用同一实例
+            dataStore = settingsStore,
         )
     }
 
@@ -92,6 +139,27 @@ object DesktopContainer {
             runCatching { database?.close() }
             database = null
         }
+    }
+
+    /**
+     * 懒扫描封面落盘（对齐安卓 CoverCacheWriter：cache/covers/<sha256(songId)>.jpg，返回 file:// URI）。
+     * 失败返回 null（封面缺失不阻塞扫描）。
+     *
+     * URI 形状必须与安卓 `Uri.fromFile()` 一致（`file:///C:/…` 三斜杠）：
+     * Java `File.toURI()` 在 Windows 上生成 `file:/C:/…` 单斜杠，coil 桌面端解析失败导致封面不展示。
+     */
+    private fun writeLazyScanCover(songId: String, bytes: ByteArray): String? {
+        if (bytes.isEmpty()) return null
+        return runCatching {
+            val directory = java.io.File(PlatformDirs.cacheDir(), "covers").apply { mkdirs() }
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(songId.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+            val file = java.io.File(directory, "$digest.jpg")
+            file.writeBytes(bytes)
+            // 三斜杠 file URI（对齐安卓 Uri.fromFile；不用 File.toURI()，Windows 下少两条斜杠）
+            "file:///" + file.absolutePath.replace('\\', '/')
+        }.getOrNull()
     }
 }
 

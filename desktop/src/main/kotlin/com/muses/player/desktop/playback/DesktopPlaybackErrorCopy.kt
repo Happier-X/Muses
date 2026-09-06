@@ -18,6 +18,7 @@ object DesktopPlaybackErrorCopy {
         "音频文件不存在或已失效，请重新扫描音源。",
         "播放失败，请检查音频文件或网络连接。",
         "触发限流，稍后重试",
+        VLC_MISSING,
     )
 
     const val DEFAULT_ERROR = "播放失败，请稍后重试。"
@@ -31,6 +32,9 @@ object DesktopPlaybackErrorCopy {
     const val FILE_NO_PERMISSION = "本地音频文件不可访问，请重新扫描或重新授权。"
     const val NETWORK = "播放失败，请检查音频文件或网络连接。"
     const val AUTH_FAILED = "WebDAV 认证失败，请检查账号或重新添加音源。"
+
+    /** VLC 原生库缺失（未装 VLC 桌面版且便携版不可用）：指引用户安装或设置 MUSES_VLC_DIR。 */
+    const val VLC_MISSING = "未找到 VLC 原生库：请安装 VLC 桌面版，或设置 MUSES_VLC_DIR 指向含 libvlc.dll 的目录。"
 
     /** 白名单内原样、否则兜底（对齐 `PlaybackErrorCopy.safeCopy`）。 */
     fun safeCopy(message: String?): String =

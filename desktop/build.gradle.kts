@@ -24,6 +24,9 @@ dependencies {
     implementation(libs.ktor.client.cio)
     // S2 解码：VLCJ 只进本模块，禁止进 commonMain（P3 约束；GPL 系见 spike.md §2，D1 已接受）
     implementation(libs.vlcj)
+    // U26 懒扫描：JaudiotaggerTagPort 在 :core:common jvmShared，其 jaudiotagger 为
+    // implementation 不透传，桌面读标签需显式声明（同版本线；同 composeApp jvmMain 注释）
+    implementation(libs.jaudiotagger)
 
     testImplementation(kotlin("test"))
     testImplementation(libs.junit)
