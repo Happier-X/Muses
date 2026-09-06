@@ -674,7 +674,10 @@ private fun AppleMusicLyricsPanel(
         fun focusItemScrollOffset(index: Int): Int {
             if (index !in lines.indices || viewportHeightPx <= 0) return 0
             val viewportAnchor = viewportHeightPx * focusPosition
-            val desiredItemTop = viewportAnchor - estimatedHeight(index) * focusPosition
+            // 聚焦行视觉高度含 lyricFocusScale 放大（与 settledMovementOffset 同口径）：
+            // 首屏/跳转用未放大高度算目标会偏下，长句换行时偏差更大
+            val focusHeight = estimatedHeight(index) * SettingsRuntime.lyricFocusScale
+            val desiredItemTop = viewportAnchor - focusHeight * focusPosition
             return -desiredItemTop.roundToInt()
         }
 
@@ -703,10 +706,14 @@ private fun AppleMusicLyricsPanel(
             }
 
             val previousIndex = visualFocusIndex
-            val targetOffset = focusItemScrollOffset(nextIndex)
 
             if (previousIndex !in lines.indices) {
-                listState.scrollToItem(nextIndex + 1, targetOffset)
+                // 首屏定位：等一帧让可见行真实高度经 onMeasured 回写进 rowHeightsPx，
+                // 再用实测高度算目标。否则首屏用估算高度（长句换行/放大行偏小）定位偏下，
+                // 后续每次回写都漂移目标导致乱跳。面板此时透明（initialLyricsPositioned=false），晚一帧无感知
+                androidx.compose.runtime.withFrameNanos { }
+                val firstTargetOffset = focusItemScrollOffset(nextIndex)
+                listState.scrollToItem(nextIndex + 1, firstTargetOffset)
                 focusProgress.forEachIndexed { index, anim ->
                     val targets = activeTimedLineIndexes.ifEmpty {
                         colorHighlightedIndex.takeIf(lines.indices::contains)?.let(::setOf).orEmpty()
@@ -722,6 +729,9 @@ private fun AppleMusicLyricsPanel(
             }
 
             if (previousIndex == nextIndex) return@LaunchedEffect
+
+            // 非首屏跳转：此时 rowHeightsPx 已有实测值，直接现算目标（首屏分支内已单独处理）
+            val targetOffset = focusItemScrollOffset(nextIndex)
 
             if (!SettingsRuntime.lyricAutoFollowEnabled) {
                 handOffFocusScale(previousIndex, nextIndex)
