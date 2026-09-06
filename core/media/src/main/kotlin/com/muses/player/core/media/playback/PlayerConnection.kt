@@ -124,6 +124,8 @@ class PlayerConnection constructor(
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             _currentMediaItem.value = mediaItem
             _mediaMetadata.value = controller?.mediaMetadata
+            // 端口派生流必须随切换同步：currentSongId 滞留 null 会把 MiniPlayer 钉在空态（「暂无播放歌曲」）
+            controller?.let { syncPortDerived(it) }
         }
 
         override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
@@ -143,6 +145,8 @@ class PlayerConnection constructor(
             _mediaMetadata.value = updated
             // 同时刷新 currentMediaItem 保持 queue 等状态一致
             _currentMediaItem.value = controller?.currentMediaItem
+            // 端口派生流同步（用落盘后的 updated，封面才进得了 MiniPlayer）
+            controller?.let { syncPortDerived(it, updated) }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -348,6 +352,23 @@ class PlayerConnection constructor(
 
     fun stop() {
         controller?.stop()
+    }
+
+    /**
+     * syncState 的增量版：同步端口派生流（currentSongId/currentMeta/artworkUri/queue）。
+     * [meta] 传回调收到的（可能已落盘封面）metadata；缺省从 player 实时读。
+     */
+    private fun syncPortDerived(player: Player, meta: androidx.media3.common.MediaMetadata = player.mediaMetadata) {
+        _currentSongId.value = player.currentMediaItem?.mediaId
+        _artworkUri.value = meta.artworkUri?.toString()
+        _currentMeta.value = com.muses.player.core.playback.PlaybackMeta(
+            title = meta.title?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            artist = meta.artist?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            album = meta.albumTitle?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            coverUri = meta.artworkUri?.toString(),
+        )
+        _queueSongIds.value = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
+        _queue.value = (0 until player.mediaItemCount).map { player.getMediaItemAt(it) }
     }
 
     private fun syncState(player: MediaController) {
