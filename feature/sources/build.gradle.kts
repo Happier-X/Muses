@@ -1,8 +1,8 @@
 // 音源 feature：KMP 双 target（android + jvm）。
-// U11 上收：WebDAV 浏览页/表单页（Toast 经 ui-shared PlatformToast 跨平台）与两个 WebDAV
-// ViewModel 进 commonMain（依赖 = :core:common + :core:ui-shared + :core:webdav[已 KMP]）；
-// 音源列表页（haze/SAF）与带扫描器的 SourcesViewModel 子类留 androidMain，
-// 扫描经 commonMain [LibraryScanPort] 注入（本地 MediaStore/WebDAV 两扫描器为安卓栈）。
+// U20 全量上收：音源列表页 SourcesScreen（原 androidMain）进 commonMain——
+// SAF 选目录抽为 rememberLocalFolderPicker expect/actual（androidMain=SAF，
+// jvmMain=Swing），扫描经 commonMain [LibraryScanPort] 注入（androidMain 绑定
+// MediaStore/WebDAV 两扫描器），haze 2.0 为 KMP 工件。
 // 形态与约束同 :feature:library / :feature:playlist（android.kmp.library，不升级版本线）。
 plugins {
     alias(libs.plugins.android.kmp.library)
@@ -31,16 +31,19 @@ kotlin {
             implementation(compose.material3)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.kotlinx.coroutines.core)
-            // P2a Koin（统一 4.2.0；KMP sourceSets 不支持 platform(BOM)，toml 已显式挂版本）
+            // P2a Koin（统一 4.2.0；KMP sourceSets 依赖处理器不支持 platform(BOM)，toml 已显式挂版本）
             implementation(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
+            // U20：列表页 haze 玻璃（2.0 起 KMP 工件，双端同源）
+            implementation(libs.haze)
+            implementation(libs.haze.blur)
         }
 
         androidMain.dependencies {
-            // 列表页 haze 玻璃 + 扫描器（MediaStore/WebDAV，安卓媒体栈）
+            // 扫描器（MediaStore/WebDAV，安卓媒体栈，AndroidLibraryScanPort 消费）
             implementation(project(":core:media"))
-            implementation(libs.haze)
-            implementation(libs.haze.blur)
+            // SAF 系统目录选择器（rememberLauncherForActivityResult）
+            implementation(libs.androidx.activity.compose)
         }
     }
 }

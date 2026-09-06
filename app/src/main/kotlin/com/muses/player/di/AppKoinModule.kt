@@ -14,9 +14,10 @@ import com.muses.player.feature.player.playerModule
 // U19：playlist 全量上收 commonMain，playlistCoreModule 单装配（原 playlistModule 并入后废弃）
 import com.muses.player.feature.playlist.playlistCoreModule
 import com.muses.player.feature.scrape.scrapeFeatureModule
-// U11：sourcesModule（安卓扫描 VM）+ sourcesCoreModule（WebDAV 浏览/表单共享 VM）双装配
+// U20：sources 全量上收 commonMain——sourcesCoreModule 装配共享 VM，sourcesPlatformModule
+// 绑定安卓扫描端口（MediaStore/WebDAV 扫描器）
 import com.muses.player.feature.sources.sourcesCoreModule
-import com.muses.player.feature.sources.sourcesModule
+import com.muses.player.feature.sources.sourcesPlatformModule
 import com.muses.player.navigation.MainViewModel
 import com.muses.player.settings.SettingsViewModel
 import org.koin.core.module.dsl.viewModel
@@ -42,7 +43,7 @@ val appModules = listOf(
     playerModule,
     playlistCoreModule,
     scrapeFeatureModule,
-    sourcesModule,
+    sourcesPlatformModule,
     sourcesCoreModule,
     appModule,
 )

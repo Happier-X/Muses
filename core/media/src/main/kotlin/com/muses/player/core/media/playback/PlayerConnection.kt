@@ -276,8 +276,8 @@ class PlayerConnection constructor(
         controller?.clearMediaItems()
     }
 
-    /** 从队列中移除指定 songIds 的条目（删源时清理播放队列与底部栏残留） */
-    fun removeFromQueue(songIds: Set<String>) {
+    /** 从队列中移除指定 songIds 的条目（删源时清理播放队列与底部栏残留；U20 收编端口面） */
+    override fun removeFromQueue(songIds: Set<String>) {
         if (songIds.isEmpty()) return
         val player = controller ?: return
         // 需要在主线程操作 ExoPlayer（Media3 主线程铁律），此处由主线程调用方保证或 post

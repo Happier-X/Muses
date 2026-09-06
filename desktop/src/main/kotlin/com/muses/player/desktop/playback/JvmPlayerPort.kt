@@ -221,6 +221,12 @@ class JvmPlayerPort(
         queue.removeSongs(setOf(songId))
     }
 
+    /** U20：按 songId 集合清理队列（删音源同步清队列；复用状态机 removeSongs） */
+    fun removeFromQueue(songIds: Set<String>) {
+        if (songIds.isEmpty()) return
+        queue.removeSongs(songIds)
+    }
+
     /** U16：清空播放队列（当前曲播放不受影响，队列态清空） */
     fun clearQueueItems() {
         queue.removeSongs(queue.activeOrder().map { it.songId }.toSet())

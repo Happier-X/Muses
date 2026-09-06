@@ -52,14 +52,16 @@ sealed class TestState {
 }
 
 /**
- * 音源 ViewModel 数据核（U11 KMP 上收）：音源 CRUD/表单/扫描编排进 commonMain，
- * 依赖全部为 KMP 数据栈（P2b/W3/W4 产物）+ [LibraryScanPort] + 播放队列清理回调。
- * 安卓子类 [SourcesViewModel]（androidMain）注入两扫描器与 PlayerConnection；
- * SAF 树 uri 建源（android 平台选择器）留安卓子类。
+ * 音源 ViewModel（U20 全量上收 commonMain）：数据核 + 页面扩展一体——音源 CRUD/表单/
+ * 扫描编排/本地建源进 commonMain，依赖全部为 KMP 数据栈（P2b/W3/W4 产物）+
+ * [LibraryScanPort]（androidMain 绑定 MediaStore/WebDAV 扫描器）+ 播放队列清理
+ * （经 [com.muses.player.core.playback.PlaybackPort].removeFromQueue 注入回调）。
+ * 原安卓子类（扫描器装配 + SAF 树 uri 建源）已并入：SAF 选目录改为
+ * [rememberLocalFolderPicker] expect/actual，物理路径解析留安卓 actual。
  */
 @OptIn(ExperimentalUuidApi::class)
-open class SourcesCoreViewModel constructor(
-    protected val sourceRepository: SourceRepository,
+class SourcesViewModel constructor(
+    private val sourceRepository: SourceRepository,
     private val songRepository: SongRepository,
     private val scanPort: LibraryScanPort,
     private val settingsRepository: SettingsRepository,
@@ -70,7 +72,7 @@ open class SourcesCoreViewModel constructor(
     private val webDavAuthRegistry: WebDavAuthRegistry,
     private val playbackStateRepository: PlaybackStateRepository,
     private val recentPlaysRepository: RecentPlaysRepository,
-    /** 删除音源时的播放队列清理（安卓接 PlayerConnection；桌面无播放队列，默认空实现） */
+    /** 删除音源时的播放队列清理（双端接 PlaybackPort.removeFromQueue；可缺省空实现） */
     private val onRemoveFromQueue: (Set<String>) -> Unit = {},
 ) : ViewModel() {
 
@@ -236,6 +238,33 @@ open class SourcesCoreViewModel constructor(
             )
             // 源变更后同步播放认证注册表（本地源无影响，refresh 幂等开销可忽略）
             webDavAuthRegistry.refresh()
+        }
+    }
+
+    /**
+     * 本地目录建源（U20：原安卓 saveLocalSourceFromTreeUri 的平台无关部分）。
+     * 物理路径由各端选择器 actual 解析（安卓 SAF tree uri → 绝对路径；桌面原生路径），
+     * 供 LocalLibraryScanner 的前缀过滤直接使用。
+     */
+    fun saveLocalSource(physicalPath: String) {
+        if (physicalPath.isBlank()) return
+        viewModelScope.launch {
+            try {
+                val displayName = physicalPath.substringAfterLast('/').ifEmpty { "本地文件夹" }
+                val now = platformNowMs()
+                sourceRepository.upsert(
+                    Source(
+                        id = Uuid.random().toString(),
+                        name = displayName,
+                        type = SourceType.LOCAL,
+                        path = physicalPath,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+            } catch (_: Exception) {
+                // 建源失败静默（对齐 Web FilePicker 取消语义）
+            }
         }
     }
 

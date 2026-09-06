@@ -199,6 +199,16 @@ class DesktopPlayerHook(
         }
     }
 
+    /** U20：按 songId 集合清理队列（删音源同步清队列） */
+    override fun removeFromQueue(songIds: Set<String>) {
+        scope.launch {
+            runCatching {
+                ensurePlayer().removeFromQueue(songIds)
+                _queueSongIds.value = ensurePlayer().activeOrderIds()
+            }
+        }
+    }
+
     override fun clearQueueItems() {
         scope.launch {
             runCatching {

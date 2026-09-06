@@ -66,6 +66,12 @@ interface PlaybackPort : PlayerPort {
 
     fun removeQueueItemAt(index: Int)
 
+    /**
+     * 按 songId 集合清理播放队列（U20：删音源时同步清队列，语义同安卓
+     * PlayerConnection.removeFromQueue；桌面 JvmPlayerPort 复用状态机 removeSongs）。
+     */
+    fun removeFromQueue(songIds: Set<String>)
+
     fun clearQueueItems()
 
     fun skipToNext()

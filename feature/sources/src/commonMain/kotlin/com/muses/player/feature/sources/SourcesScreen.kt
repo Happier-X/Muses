@@ -1,11 +1,6 @@
 package com.muses.player.feature.sources
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import android.content.Intent
-import android.net.Uri
-import android.provider.DocumentsContract
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -94,7 +89,6 @@ fun SourcesScreen(
     viewModel: SourcesViewModel = koinViewModel(),
 ) {
     val salt = LocalSaltColors.current
-    val context = androidx.compose.ui.platform.LocalContext.current
     val sources by viewModel.sources.collectAsState()
     val showAddForm by viewModel.showAddForm.collectAsState()
     // 扫描进度弹窗观察 scanner 内部进度流
@@ -165,18 +159,10 @@ fun SourcesScreen(
         }
     }
 
-    // ---- 系统目录选择器（添加本地文件夹）：SAF tree uri → 物理路径前缀 → 建源 ----
-    val dirPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree(),
-    ) { treeUri: Uri? ->
-        if (treeUri != null) {
-            // 持久化读写权限：重启后扫描/播放仍可访问该目录
-            context.contentResolver.takePersistableUriPermission(
-                treeUri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
-            viewModel.saveLocalSourceFromTreeUri(treeUri, context)
-        }
+    // ---- 系统目录选择器（添加本地文件夹）：expect/actual 端口 → 物理路径 → 建源 ----
+    // （安卓 SAF tree uri 解析 + 授权持久化在 androidMain actual；桌面 Swing 目录选择在 jvmMain actual）
+    val pickLocalFolder = rememberLocalFolderPicker { physicalPath ->
+        viewModel.saveLocalSource(physicalPath)
     }
 
     // ---- m-actions：添加音源 ----
@@ -188,8 +174,8 @@ fun SourcesScreen(
             items = listOf(
                 SaltActionItem(label = "添加本地文件夹", onClick = {
                     viewModel.closeAddActionSheet()
-                    // 系统目录选择器（SAF）：选完回调内建源，对齐 Web FilePicker.pickDirectory 语义
-                    dirPickerLauncher.launch(null)
+                    // 系统目录选择器：选完回调内建源，对齐 Web FilePicker.pickDirectory 语义
+                    pickLocalFolder()
                 }),
                 SaltActionItem(label = "添加 WebDAV 文件夹", onClick = {
                     viewModel.closeAddActionSheet()
