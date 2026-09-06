@@ -64,6 +64,25 @@ object DesktopRuntime {
 }
 
 /**
+ * U23：桌面曲库扫描端口占位——桌面暂无 MediaStore/WebDAV 扫描栈（:core:media 安卓专属），
+ * 共享音源页经 sourcesCoreModule 解析 SourcesViewModel 时需要本绑定；扫描返回空列表
+ * （UI 汇总「共 0 首」），删源/编辑/WebDAV 表单全链路不受影响。
+ */
+object DesktopLibraryScanPort : com.muses.player.feature.sources.LibraryScanPort {
+    private val idle = kotlinx.coroutines.flow.MutableStateFlow(
+        com.muses.player.core.media.scanner.ScanProgress(),
+    )
+
+    override fun progressFor(type: com.muses.player.core.model.SourceType) =
+        idle as kotlinx.coroutines.flow.Flow<com.muses.player.core.media.scanner.ScanProgress>
+
+    override suspend fun scan(
+        source: com.muses.player.core.model.Source,
+        readTags: Boolean,
+    ): List<com.muses.player.core.model.Song> = emptyList()
+}
+
+/**
  * U9 桌面装配：共享 ViewModel（:feature:library commonMain）依赖的 DAO/Repository
  * 接 :core:common JVM 库（[DesktopContainer.database] 单例，P2b 后数据栈全 KMP）。
  * 仓库实现同为 commonMain RoomXxxRepository，安卓侧 Koin 装配（core:data）同构。
@@ -71,6 +90,10 @@ object DesktopRuntime {
  * U11 扩充：SourceRepository/CredentialsRepository/ErrorLogStore（WebDAV 链路依赖，
  * [webdavCoreModule] 的 AuthRegistry/KtorWebDavClient 构造需要）+ webdavCoreModule +
  * sourcesCoreModule（共享 WebDAV 浏览/表单 ViewModel，桌面复用共享浏览页）。
+ *
+ * U23 扩充（切共享壳）：settingsStore 共享单例 + Settings/PlaybackState/RecentPlays
+ * 三仓库（sourcesCoreModule 的 SourcesViewModel 依赖）+ LibraryScanPort 占位 +
+ * AppVersionProvider（DesktopRuntime 构建期资源版本）。
  */
 fun desktopLibraryModule(): Module = module {
     // U12：端口绑定——共享 PlayerViewModel 经 PlaybackPort 消费桌面播放栈
@@ -88,6 +111,20 @@ fun desktopLibraryModule(): Module = module {
     // WebDAV 链路日志（桌面无 CrashHandler 落盘链，环形缓冲即可）
     single<ErrorLogStore> { RingBufferErrorLogStore() }
 
+    // ── U23：共享壳（音源页/设置页）依赖补齐 ──
+    single { DesktopContainer.settingsStore }
+    single<com.muses.player.core.data.repository.SettingsRepository> {
+        com.muses.player.core.data.repository.DataStoreSettingsRepository(get())
+    }
+    single { com.muses.player.core.data.repository.PlaybackStateRepository(get()) }
+    single { com.muses.player.core.data.repository.RecentPlaysRepository(get()) }
+    single<com.muses.player.feature.sources.LibraryScanPort> { DesktopLibraryScanPort }
+    single<com.muses.player.feature.shell.platform.AppVersionProvider> {
+        object : com.muses.player.feature.shell.platform.AppVersionProvider {
+            override val versionName: String = DesktopRuntime.appVersion()
+        }
+    }
+
     // ── U14 刮削共享 VM 依赖（实例来自 DesktopScrapeGraph，引擎装配与安卓 ScrapeModule 同口径）──
     single { com.muses.player.desktop.DesktopScrapeGraph.queueStore }
     single { com.muses.player.desktop.DesktopScrapeGraph.textMetaMatcher }
@@ -103,6 +140,9 @@ val desktopAppModules: List<Module> = listOf(
     desktopLibraryModule(),
     libraryModule,
     playerModule,
+    // U23：共享壳路由消费的歌单 VM + 壳层 VM（Main/Settings）
+    com.muses.player.feature.playlist.playlistCoreModule,
+    com.muses.player.feature.shell.di.shellModule,
     scrapeFeatureModule,
     webdavCoreModule,
     sourcesCoreModule,

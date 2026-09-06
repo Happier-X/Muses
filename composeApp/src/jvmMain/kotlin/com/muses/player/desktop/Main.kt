@@ -79,7 +79,6 @@ fun main() = application {
         MusesDesktopApp(
             windowState = state,
             onClose = ::exitApplication,
-            playerHook = playerHook,
         )
     }
 }

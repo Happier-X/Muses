@@ -33,6 +33,15 @@ object DesktopContainer {
             database ?: createJvmDatabase().also { database = it }
         }
 
+    /**
+     * U23：进程级共享 Preferences DataStore 单例——同文件多 DataStore 实例会抛
+     * multiple DataStores active，凭据（DesktopCredentials）与设置/播放状态/
+     * 最近播放仓库（Koin 绑定）必须共用本实例。
+     */
+    val settingsStore: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> by lazy {
+        com.muses.player.core.data.store.createDataStore()
+    }
+
     fun audioCache(): DesktopWebDavAudioCache = DesktopWebDavAudioCache()
 
     /** 凭据仓库（commonMain [CredentialsRepository] 实现；DataStore 单实例由类内 lazy 保证）。 */
@@ -98,8 +107,8 @@ class DesktopCredentials : CredentialsRepository {
 
     private companion object {
         // 进程级单实例：同文件（muses_settings）多 DataStore 实例会抛 multiple DataStores active，
-        // DesktopContainer.playerPort / credentials() 各自新建本类实例时必须共享同一 store
-        val store by lazy { com.muses.player.core.data.store.createDataStore() }
+        // U23 起统一走 DesktopContainer.settingsStore（凭据/设置/播放状态/最近播放共享）
+        val store = DesktopContainer.settingsStore
     }
 
     override suspend fun savePassword(sourceId: String, password: String) {

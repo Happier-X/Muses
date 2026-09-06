@@ -1,172 +1,47 @@
 package com.muses.player.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.WindowState
-import androidx.compose.runtime.CompositionLocalProvider
-import com.muses.player.core.ui.theme.LocalHazeBlurState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import com.muses.player.core.ui.theme.SaltTheme
 import com.muses.player.core.uishared.platform.DesktopToastOverlay
-import com.muses.player.desktop.playback.DesktopPlayerHook
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.rememberHazeState
+import com.muses.player.navigation.MusesApp
 import org.koin.compose.KoinApplication
 
 /**
- * 桌面主界面（S3b）：标题栏 + 平板双栏（侧边导航 + 内容区）。
- * 桌面宽度默认 1280dp，天然落在平板断点（>=768dp）之上。
+ * 桌面主界面（U23 切共享壳）：标题栏（jvmMain 桌面专属：无边框窗口拖拽/控制）
+ * + 双端共享 [MusesApp]（CMP Navigation + TabsLayout，1280 宽窗口天然落 aside
+ * 260px 侧栏形态）+ 桌面 Toast 浮层。
  *
- * U5 曲目列表共用化：包裹 SaltTheme 使共享组件可正确取色。
- * U9 曲库共用化：顶层挂 Koin（desktopAppModules），共享 ViewModel 经 koinViewModel() 注入。
- * U2 桌面真模糊：创建 HazeState 并 provide LocalHazeBlurState（Any? 擦除桥接，
- * 与安卓 TabsLayout 同模式）；内容区 hazeSource 标记取样层，共享组件的
- * SaltNavbar/MiniPlayerBar 等经 platformBlurModifier 获得真磨砂。
+ * 历史：S3b 自绘 220dp 侧栏 + DesktopDestination enum 切屏（无返回栈）——U23 废弃，
+ * 桌面获得与安卓一致的完整路由（曲库五页/歌单/详情/WebDAV/播放队列/刮削审核流）。
  */
 @Composable
 fun MusesDesktopApp(
     windowState: WindowState,
     onClose: () -> Unit,
-    viewModel: DesktopViewModel = remember { DesktopViewModel() },
-    playerHook: DesktopPlayerHook? = null,
 ) {
-    val destination by viewModel.destination.collectAsState()
-    val hazeState = rememberHazeState()
-
     KoinApplication(application = { modules(desktopAppModules) }) {
-        CompositionLocalProvider(LocalHazeBlurState provides hazeState) {
-            SaltTheme {
-                // Box 承载内容 + Toast 浮层（U2：桌面 PlatformToast 经 DesktopToastOverlay 渲染）
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.fillMaxSize().background(Color(0xFF11111B))) {
-                        DesktopTitleBar(
-                            windowState = windowState,
-                            onClose = onClose,
-                        )
-                        Row(modifier = Modifier.fillMaxSize()) {
-                            // 侧边导航（TabletLayout 双栏：260px 侧边栏）
-                            DesktopSidebar(
-                                current = destination,
-                                onNavigate = viewModel::navigate,
-                            )
-                            // 内容区（hazeSource：作为模糊取样层，磨砂导航条读取其下内容）
-                            Box(
-                                modifier = Modifier.weight(1f).fillMaxHeight()
-                                    .hazeSource(state = hazeState),
-                            ) {
-                                when (destination) {
-                                    DesktopDestination.LIBRARY -> LibraryScreen(playerHook = playerHook)
-                                    DesktopDestination.PLAYER -> PlayerScreen(playerHook = playerHook)
-                                    DesktopDestination.SOURCES -> SourceManagerScreen()
-                                    DesktopDestination.SCRAPE -> com.muses.player.feature.scrape.ScrapeScreen()
-                                    DesktopDestination.SETTINGS -> SettingsScreen()
-                                }
-                            }
-                        }
-                        // U2：桌面 Toast 浮层（消费 PlatformToast 总线，覆盖于内容之上、不拦截点击）
-                        DesktopToastOverlay()
+        SaltTheme {
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize().background(Color(0xFF11111B))) {
+                    DesktopTitleBar(
+                        windowState = windowState,
+                        onClose = onClose,
+                    )
+                    // 共享导航壳（hazeState 由 TabsLayout 内部 provide，磨砂导航/迷你条真磨砂）
+                    Box(modifier = Modifier.weight(1f).fillMaxSize()) {
+                        MusesApp()
                     }
                 }
+                // U2：桌面 Toast 浮层（消费 PlatformToast 总线，覆盖于内容之上、不拦截点击）
+                DesktopToastOverlay()
             }
         }
-    }
-}
-
-@Composable
-private fun DesktopSidebar(
-    current: DesktopDestination,
-    onNavigate: (DesktopDestination) -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .width(220.dp)
-            .fillMaxHeight()
-            .background(Color(0xFF181825))
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Text(
-            text = "Muses",
-            color = Color(0xFFCDD6F4),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
-        )
-        SidebarItem(
-            label = "曲库",
-            selected = current == DesktopDestination.LIBRARY,
-            onClick = { onNavigate(DesktopDestination.LIBRARY) },
-        )
-        SidebarItem(
-            label = "播放",
-            selected = current == DesktopDestination.PLAYER,
-            onClick = { onNavigate(DesktopDestination.PLAYER) },
-        )
-        SidebarItem(
-            label = "音源",
-            selected = current == DesktopDestination.SOURCES,
-            onClick = { onNavigate(DesktopDestination.SOURCES) },
-        )
-        SidebarItem(
-            label = "刮削",
-            selected = current == DesktopDestination.SCRAPE,
-            onClick = { onNavigate(DesktopDestination.SCRAPE) },
-        )
-        SidebarItem(
-            label = "设置",
-            selected = current == DesktopDestination.SETTINGS,
-            onClick = { onNavigate(DesktopDestination.SETTINGS) },
-        )
-    }
-}
-
-@Composable
-private fun SidebarItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .background(if (selected) Color(0xFF313244) else Color.Transparent)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick,
-            )
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        Text(
-            text = label,
-            color = if (selected) Color(0xFF89B4FA) else Color(0xFFBAC2DE),
-            fontSize = 14.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
     }
 }
