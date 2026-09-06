@@ -6,10 +6,31 @@ plugins {
     alias(libs.plugins.compose.multiplatform)
 }
 
+// U15：运行时版本号——CI 以 -Pmuses.desktop.version 注入（与下方 jpackage packageVersion
+// 同源同值），构建期写入资源文件，桌面设置页「检查更新」经 classpath 读取；
+// 本地/无属性时回落 1.0.0（与 packageVersion 回落一致）。
+val musesDesktopVersion = (project.findProperty("muses.desktop.version") as String?) ?: "1.0.0"
+val desktopVersionDir = layout.buildDirectory.dir("generated/desktopVersion")
+val generateDesktopVersion by tasks.registering {
+    outputs.file(desktopVersionDir.map { it.file("muses-desktop-version.txt") })
+    // 版本属性必须声明为任务输入：否则 -P 变化时任务 up-to-date 跳过，资源不重写
+    inputs.property("musesDesktopVersion", musesDesktopVersion)
+    doLast {
+        val out = desktopVersionDir.get().asFile.resolve("muses-desktop-version.txt")
+        out.parentFile.mkdirs()
+        out.writeText(musesDesktopVersion)
+    }
+}
+
 kotlin {
     jvm()
 
     sourceSets {
+        // 版本资源目录（生成任务见文件头；processResources 依赖在文件尾挂接）
+        jvmMain {
+            resources.srcDir(desktopVersionDir)
+        }
+
         commonMain.dependencies {
             implementation(compose.material3)
             implementation(compose.foundation)
@@ -80,4 +101,9 @@ compose.desktop {
             }
         }
     }
+}
+
+// KMP jvm 资源任务挂生成依赖（资源目录经 srcDir 已声明，此处补任务级依赖）
+tasks.matching { it.name == "processJvmMainResources" }.configureEach {
+    dependsOn(generateDesktopVersion)
 }

@@ -1,85 +1,34 @@
 package com.muses.player.desktop
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import com.muses.player.core.data.db.SourceEntity
+import com.muses.player.core.data.log.ErrorLogStore
+import com.muses.player.core.ui.components.SettingsAboutFeedbackContent
 import com.muses.player.core.ui.components.SettingsScreen
-import com.muses.player.core.ui.components.SettingsSource
-import com.muses.player.desktop.di.DesktopContainer
-import com.muses.player.desktop.di.DesktopCredentials
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import java.util.UUID
+import org.koin.compose.koinInject
 
 /**
- * 桌面设置页（共用化后）：调用 ui-shared 共用 [SettingsScreen]，
- * 业务逻辑（DAO / 凭据）经回调注入。
+ * 桌面设置页（U15）：与安卓同构——ui-shared 共享容器 + 共享「关于/反馈」扩展区块；
+ * 平台动作（浏览器/剪贴板）经 DesktopRuntime 注入，报错日志同源 ErrorLogStore
+ * （桌面 Koin 绑定 RingBufferErrorLogStore）。
  */
 @Composable
 fun SettingsScreen() {
-    val scope = rememberCoroutineScope()
-    var sources by remember { mutableStateOf<List<SettingsSource>>(emptyList()) }
-
-    fun reload() {
-        scope.launch {
-            runCatching {
-                val entities = DesktopContainer.database().sourceDao().observeAll().first()
-                sources = entities.map { it.toSettingsSource() }
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) { reload() }
+    val errorLog = koinInject<ErrorLogStore>()
+    val latestSummary by errorLog.latestSummary.collectAsState()
 
     SettingsScreen(
-        sources = sources,
-        onSave = { name, url, username, password ->
-            runCatching {
-                val id = UUID.randomUUID().toString()
-                val now = System.currentTimeMillis()
-                DesktopContainer.database().sourceDao().upsert(
-                    SourceEntity(
-                        id = id,
-                        name = name,
-                        type = "WEBDAV",
-                        url = url,
-                        username = username.ifBlank { null },
-                        createdAt = now,
-                        updatedAt = now,
-                    ),
-                )
-                if (password.isNotBlank()) {
-                    DesktopCredentials().savePassword(id, password)
-                }
-                reload()
-            }.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { Result.failure(it) },
-            )
-        },
-        onDelete = { sourceId ->
-            runCatching {
-                DesktopContainer.database().sourceDao().deleteById(sourceId)
-                DesktopContainer.database().songDao().deleteBySource(sourceId)
-                DesktopCredentials().clearPassword(sourceId)
-                reload()
-            }.fold(
-                onSuccess = { Result.success(Unit) },
-                onFailure = { Result.failure(it) },
+        extraContent = {
+            SettingsAboutFeedbackContent(
+                // U15：运行时版本（构建期资源注入，与 jpackage packageVersion 同源）
+                versionName = DesktopRuntime.appVersion(),
+                onOpenUrl = { DesktopRuntime.openUrl(it) },
+                onCopyToClipboard = { DesktopRuntime.copyToClipboard(it) },
+                onCheckUpdate = { current -> com.muses.player.core.appupdate.checkLatestRelease(current) },
+                errorLogSummary = latestSummary,
+                onDumpLogs = { errorLog.dump() },
             )
         },
     )
 }
-
-/** Room SourceEntity → 跨平台 SettingsSource 映射 */
-private fun SourceEntity.toSettingsSource() = SettingsSource(
-    id = id,
-    name = name,
-    url = url,
-    username = username,
-)

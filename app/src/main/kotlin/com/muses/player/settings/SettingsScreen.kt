@@ -5,65 +5,27 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import com.muses.player.core.ui.icons.TablerIcons
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.muses.player.core.appupdate.checkLatestRelease
 import com.muses.player.core.data.log.ErrorLogStore
-import com.muses.player.core.ui.components.SettingsBlockTitle
-import com.muses.player.core.ui.components.SettingsIcon
+import com.muses.player.core.ui.components.SettingsAboutFeedbackContent
 import com.muses.player.core.ui.components.SettingsScreen
-import com.muses.player.core.ui.components.SettingsSource
-import com.muses.player.core.ui.components.SaltListItem
-import com.muses.player.core.ui.components.SaltNavbar
-import com.muses.player.core.ui.theme.LocalSaltColors
-import com.muses.player.core.ui.theme.SaltRadius
-import com.muses.player.core.ui.theme.SaltSpacing
 import com.muses.player.BuildConfig
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SettingsViewModel constructor(
     private val errorLogStore: ErrorLogStore,
@@ -89,164 +51,33 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
-    val salt = LocalSaltColors.current
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var checking by remember { mutableStateOf(false) }
-    var toastMessage by remember { mutableStateOf<String?>(null) }
 
     val hazeState = rememberHazeState()
     CompositionLocalProvider(
         // 09-05 T2：MusesHaze 下线，统一经 ui-shared 的 LocalHazeBlurState 桥接
         com.muses.player.core.ui.theme.LocalHazeBlurState provides hazeState,
     ) {
-        // Android 端：音源管理为空（仅桌面端有 WebDAV 音源管理），
-        // 通过 extraContent 插入「关于」和「反馈」区块。
+        // U15：设置页共享组件（音源区块已移除，独立音源页承载）；「关于/反馈」扩展区为
+        // 双端共享实现（SettingsAboutFeedbackContent），平台动作经回调注入。
         SettingsScreen(
-            sources = emptyList(),
-            onSave = { _, _, _, _ -> Result.success(Unit) },
-            onDelete = { _ -> Result.success(Unit) },
             modifier = modifier,
             extraContent = {
-                // ---- 关于 ----
-                SettingsBlockTitle(text = "关于")
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = SaltSpacing.spacingSub)
-                        .background(salt.surface1, RoundedCornerShape(SaltRadius.card))
-                        .padding(vertical = 4.dp),
-                ) {
-                    // Muses 版本
-                    SaltListItem(
-                        title = "Muses",
-                        subtitle = "应用版本 ${BuildConfig.VERSION_NAME}",
-                        onClick = null,
-                        leading = {
-                            SettingsIcon(icon = TablerIcons.Info)
-                        },
-                    )
-                    // 检查更新
-                    SaltListItem(
-                        title = "检查更新",
-                        subtitle = if (checking) "正在检查更新…" else null,
-                        onClick = {
-                            if (checking) return@SaltListItem
-                            checking = true
-                            scope.launch {
-                                val result = checkLatestRelease(BuildConfig.VERSION_NAME)
-                                toastMessage = if (result == null) {
-                                    "检查更新失败，请稍后重试"
-                                } else {
-                                    val (tag, url) = result
-                                    val latestVer = tag.removePrefix("v")
-                                    val currentVer = BuildConfig.VERSION_NAME
-                                        .removeSuffix("-miui")
-                                        .substringBefore("-")
-                                    if (compareVersions(latestVer, currentVer) <= 0) {
-                                        "已是最新版本"
-                                    } else {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                        "发现新版本 $tag"
-                                    }
-                                }
-                                checking = false
-                            }
-                        },
-                        leading = {
-                            SettingsIcon(icon = TablerIcons.Refresh)
-                        },
-                    )
-                }
-
-                // ---- 反馈 ----（任务 08-26-settings-log-viewer）
                 val latestSummary by viewModel.latestErrorSummary.collectAsState()
-                SettingsBlockTitle(text = "反馈")
-                Column(
-                    modifier = Modifier
-                        .padding(horizontal = SaltSpacing.spacingSub)
-                        .background(salt.surface1, RoundedCornerShape(SaltRadius.card))
-                        .padding(vertical = 4.dp),
-                ) {
-                    SaltListItem(
-                        title = "复制报错日志",
-                        subtitle = latestSummary ?: "暂无报错记录",
-                        onClick = {
-                            scope.launch {
-                                val text = viewModel.dumpLogs()
-                                if (text == null) {
-                                    toastMessage = "暂无可复制的日志"
-                                } else {
-                                    val clipboard = context.getSystemService(
-                                        Context.CLIPBOARD_SERVICE,
-                                    ) as ClipboardManager
-                                    clipboard.setPrimaryClip(
-                                        ClipData.newPlainText("Muses 报错日志", text),
-                                    )
-                                    toastMessage = "已复制报错日志"
-                                }
-                            }
-                        },
-                        leading = {
-                            SettingsIcon(icon = TablerIcons.BugReport)
-                        },
-                    )
-                }
+                SettingsAboutFeedbackContent(
+                    versionName = BuildConfig.VERSION_NAME,
+                    onOpenUrl = { url ->
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                    },
+                    onCopyToClipboard = { text ->
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Muses 报错日志", text))
+                    },
+                    onCheckUpdate = { current -> checkLatestRelease(current) },
+                    errorLogSummary = latestSummary,
+                    onDumpLogs = { viewModel.dumpLogs() },
+                )
             },
         )
     }
-
-    // Toast 显示（m-toast center 行为层；样式组件待后续统一落地）
-    LaunchedEffect(toastMessage) {
-        toastMessage?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-            delay(2000)
-            toastMessage = null
-        }
-    }
-}
-
-/**
- * 检查 GitHub 最新 release —— 对照 SettingsPage.vue checkUpdate。
- * 返回 (tag, html_url)；网络/格式异常返回 null 并由调用方区分提示不足——
- * 这里简化为统一失败文案，与 Web 层 403 分支的细分提示在行为层等价。
- */
-private suspend fun checkLatestRelease(currentVersion: String): Pair<String, String>? {
-    return withContext(Dispatchers.IO) {
-        var connection: java.net.HttpURLConnection? = null
-        try {
-            connection = java.net.URL("https://api.github.com/repos/Happier-X/muses/releases/latest")
-                .openConnection() as java.net.HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-            connection.setRequestProperty("User-Agent", "Muses/${BuildConfig.VERSION_NAME} (Android)")
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-            val code = connection.responseCode
-            if (code != 200) {
-                return@withContext null
-            }
-            val body = connection.inputStream.bufferedReader().readText()
-            val tag = Regex("\"tag_name\"\\s*:\\s*\"(v\\d+\\.\\d+\\.\\d+)\"").find(body)?.groupValues?.getOrNull(1)
-            val htmlUrl = Regex("\"html_url\"\\s*:\\s*\"([^\"]+)\"").find(body)?.groupValues?.getOrNull(1)
-            if (tag != null && htmlUrl != null) tag to htmlUrl else null
-        } catch (_: Exception) {
-            null
-        } finally {
-            connection?.disconnect()
-        }
-    }
-}
-
-/** 版本号比较（语义同 Web 层 compareVersions） */
-private fun compareVersions(a: String, b: String): Int {
-    val partsA = a.split('.').map { it.toIntOrNull() ?: 0 }
-    val partsB = b.split('.').map { it.toIntOrNull() ?: 0 }
-    val len = maxOf(partsA.size, partsB.size)
-    for (i in 0 until len) {
-        val va = partsA.getOrElse(i) { 0 }
-        val vb = partsB.getOrElse(i) { 0 }
-        if (va > vb) return 1
-        if (va < vb) return -1
-    }
-    return 0
 }

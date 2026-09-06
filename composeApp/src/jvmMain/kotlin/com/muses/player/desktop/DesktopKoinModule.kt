@@ -34,6 +34,33 @@ object DesktopRuntime {
         playerHook ?: synchronized(this) {
             playerHook ?: DesktopPlayerHook().also { playerHook = it }
         }
+
+    /** U15：打开外部链接（系统默认浏览器；无桌面会话时静默失败） */
+    fun openUrl(url: String) {
+        runCatching {
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().browse(java.net.URI(url))
+            }
+        }
+    }
+
+    /** U15：写入系统剪贴板（awt Toolkit，与安卓 ClipboardManager 对等） */
+    fun copyToClipboard(text: String) {
+        runCatching {
+            val clipboard = java.awt.Toolkit.getDefaultToolkit().systemClipboard
+            clipboard.setContents(java.awt.datatransfer.StringSelection(text), null)
+        }
+    }
+
+    /**
+     * U15：运行时版本号（构建期写入 muses-desktop-version.txt 资源，与 jpackage
+     * packageVersion 同源）；资源缺失（异常环境）回落 1.0.0。
+     */
+    fun appVersion(): String =
+        runCatching {
+            DesktopRuntime::class.java.getResourceAsStream("/muses-desktop-version.txt")
+                ?.bufferedReader()?.use { it.readText() }?.trim()
+        }.getOrNull()?.takeIf { it.isNotEmpty() } ?: "1.0.0"
 }
 
 /**
