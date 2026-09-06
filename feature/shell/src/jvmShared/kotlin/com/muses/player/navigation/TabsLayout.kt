@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
  *
  * 结构对照：
  * - 宽屏（≥768px，Web 断点口径）→ `.tabs-layout__aside`：固定左侧栏，宽 260px，
- *   surface-1 底、右侧 1px hairline；
+ *   surface 底（与窄屏抽屉空隙区同色），与内容区无分界线；
  * - 窄屏 → 推屏：抽屉面板（50vw）+ 主内容（100vw），开合进度驱动两者独立偏移，
  *   动画 240ms cubic-bezier(0.32,0.72,0,1)；透明关闭交互区覆盖被推开的主页面；
  * - 导航项 `.tabs-layout__nav-link`：min-height 64px、图标壳固定 60px、文字 16px；
@@ -182,12 +182,13 @@ private fun TabletLayout(
         ) {
             // 平板 aside 改为卡片形态（对齐手机抽屉的 NavGroupCard），
             // 主/次菜单各为一张圆角卡：surface-1 底、1px hairline、16dp 圆角、
-            // 左 18 右 12 空隙，两组间距 18dp（原版仅抽屉用卡片；现统一为卡片）
+            // 左 18 右 12 空隙，两组间距 18dp（原版仅抽屉用卡片；现统一为卡片）。
+            // aside 整栏底用 surface（与窄屏抽屉空隙区同色，卡片 surface-1 浮于其上），不用 surface1
             Column(
                 Modifier
                     .width(AsideWidth)
                     .fillMaxHeight()
-                    .background(salt.surface1),
+                    .background(salt.surface),
             ) {
                 Spacer(Modifier.statusBarsPadding())
                 Column(Modifier.verticalScroll(rememberScrollState())) {
@@ -199,12 +200,6 @@ private fun TabletLayout(
                     Spacer(Modifier.navigationBarsPadding())
                 }
             }
-            Box(
-                Modifier
-                    .width(1.dp)
-                    .fillMaxHeight()
-                    .background(salt.hairline),
-            )
             Box(Modifier.weight(1f).fillMaxHeight()) {
                 content()
             }
