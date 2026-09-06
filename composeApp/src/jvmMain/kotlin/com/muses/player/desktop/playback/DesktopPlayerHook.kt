@@ -150,7 +150,13 @@ class DesktopPlayerHook(
         scope.launch {
             runCatching {
                 val port = ensurePlayer()
-                val ids = _songs.value.map { it.id }
+                // 按需读库组队列：_songs 内存缓存只由 refresh() 填充（当前无调用方），
+                // 直接依赖它会导致空队列静默失败（enqueue 空列表直接 return，无报错无状态变化）
+                val ids = db.songDao().getAll().map { it.id }
+                if (ids.isEmpty()) {
+                    _status.value = "曲库为空，请先扫描音源"
+                    return@launch
+                }
                 val index = ids.indexOf(songId).coerceAtLeast(0)
                 port.enqueue(ids, index)
                 port.play()
@@ -163,8 +169,24 @@ class DesktopPlayerHook(
     }
 
     override fun play(songId: String, songs: List<Song>) {
-        // 桌面播放语义 = 曲库列表整体入队（songs 参数忽略，见 play(songId)）
-        play(songId)
+        // 对齐安卓 PlayerConnection：调用方传入的当页列表即队列，不忽略、不查库、不依赖内存缓存
+        scope.launch {
+            runCatching {
+                val ids = songs.map { it.id }
+                if (ids.isEmpty()) {
+                    _status.value = "曲库为空，请先扫描音源"
+                    return@launch
+                }
+                val port = ensurePlayer()
+                val index = ids.indexOf(songId).coerceAtLeast(0)
+                port.enqueue(ids, index)
+                port.play()
+                _queueSongIds.value = ids
+                _status.value = ""
+            }.onFailure { e ->
+                _status.value = "播放失败：${e.message}"
+            }
+        }
     }
 
     override fun playPause() = togglePlayPause()
@@ -181,7 +203,12 @@ class DesktopPlayerHook(
         // 桌面队列重设语义：以当前队列重 enqueue 并定位（JvmPlayerPort 无 seekTo(index) 原语）
         scope.launch {
             runCatching {
-                val ids = _queueSongIds.value.ifEmpty { _songs.value.map { it.id } }
+                // 队列为空时按需读库（同 play(songId)：不依赖无调用方的 refresh() 内存缓存）
+                val ids = _queueSongIds.value.ifEmpty { db.songDao().getAll().map { it.id } }
+                if (ids.isEmpty()) {
+                    _status.value = "曲库为空，请先扫描音源"
+                    return@launch
+                }
                 val port = ensurePlayer()
                 port.enqueue(ids, index)
                 port.play()
