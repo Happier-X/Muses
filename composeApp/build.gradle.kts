@@ -1,3 +1,5 @@
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.TimeUnit
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
@@ -8,8 +10,28 @@ plugins {
 
 // U15：运行时版本号——CI 以 -Pmuses.desktop.version 注入（与下方 jpackage packageVersion
 // 同源同值），构建期写入资源文件，桌面设置页「检查更新」经 classpath 读取；
-// 本地/无属性时回落 1.0.0（与 packageVersion 回落一致）。
-val musesDesktopVersion = (project.findProperty("muses.desktop.version") as String?) ?: "1.0.0"
+// 本地/无属性时取最近 tag 本体（去 v 前缀、切掉 -22-gfa9f1883 这类后缀，
+// 如 v0.5.3-22-gfa9f1883 → 0.5.3，只显示干净版本号）；
+// 非 git 环境再回落 1.0.0（与 packageVersion 回落一致）。
+fun resolveDesktopVersion(): String {
+    (project.findProperty("muses.desktop.version") as String?)?.let { return it }
+    return runCatching {
+        // 配置期直接起进程取 tag（providers.exec 的 result 不允许配置期 get，
+        // 会直接抛异常走回落；ProcessBuilder 最稳）
+        val process = ProcessBuilder("git", "describe", "--tags", "--abbrev=0")
+            .directory(project.rootDir)
+            .redirectErrorStream(true)
+            .start()
+        check(process.waitFor(15, TimeUnit.SECONDS)) { "git describe 超时" }
+        check(process.exitValue() == 0) { "git describe 非零退出" }
+        process.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            .trim().removePrefix("v").takeIf { it.isNotEmpty() }
+    }.getOrNull() ?: run {
+        logger.warn("[muses] git describe 取版本失败，桌面版本号回落 1.0.0")
+        "1.0.0"
+    }
+}
+val musesDesktopVersion = resolveDesktopVersion()
 val desktopVersionDir = layout.buildDirectory.dir("generated/desktopVersion")
 val generateDesktopVersion by tasks.registering {
     outputs.file(desktopVersionDir.map { it.file("muses-desktop-version.txt") })

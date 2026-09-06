@@ -4,10 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.window.WindowScope
 import androidx.compose.ui.window.WindowState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.muses.player.core.ui.theme.LocalSaltColors
 import com.muses.player.core.ui.theme.SaltTheme
 import com.muses.player.core.uishared.platform.DesktopToastOverlay
 import com.muses.player.navigation.MusesApp
@@ -22,18 +23,15 @@ import org.koin.compose.KoinApplication
  * 桌面获得与安卓一致的完整路由（曲库五页/歌单/详情/WebDAV/播放队列/刮削审核流）。
  */
 @Composable
-fun MusesDesktopApp(
+fun WindowScope.MusesDesktopApp(
     windowState: WindowState,
     onClose: () -> Unit,
 ) {
     KoinApplication(application = { modules(desktopAppModules) }) {
         SaltTheme {
             Box(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.fillMaxSize().background(Color(0xFF11111B))) {
-                    DesktopTitleBar(
-                        windowState = windowState,
-                        onClose = onClose,
-                    )
+                Column(modifier = Modifier.fillMaxSize().background(LocalSaltColors.current.surface)) {
+                    DesktopTitleBar(windowState, onClose)
                     // 共享导航壳（hazeState 由 TabsLayout 内部 provide，磨砂导航/迷你条真磨砂）
                     Box(modifier = Modifier.weight(1f).fillMaxSize()) {
                         MusesApp()

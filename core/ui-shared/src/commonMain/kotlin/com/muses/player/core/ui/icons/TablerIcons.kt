@@ -74,6 +74,10 @@ object TablerIcons {
     // 位置
     val MyLocation: ImageVector = Tabler.Outline.CurrentLocation
     val LocationOn: ImageVector = Tabler.Outline.MapPin
+    // 窗口控制（桌面自绘标题栏：最小化 / 最大化 / 还原；关闭复用 Close）
+    val WindowMinimize: ImageVector = Tabler.Outline.Minus
+    val WindowMaximize: ImageVector = Tabler.Outline.Square
+    val WindowRestore: ImageVector = Tabler.Outline.Copy
 
     // 其他
     val Translate: ImageVector = Tabler.Outline.Language
