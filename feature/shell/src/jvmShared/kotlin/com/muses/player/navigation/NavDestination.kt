@@ -1,7 +1,5 @@
 package com.muses.player.navigation
 
-import androidx.annotation.StringRes
-import com.muses.player.R
 import com.muses.player.core.ui.icons.TablerIcons
 
 /**
@@ -12,39 +10,41 @@ import com.muses.player.core.ui.icons.TablerIcons
  *
  * childPrefixes 对照 Web 层同名语义：详情页打开时对应导航项保持激活态
  * （isNavActive：route 精确匹配 / route+`/` 前缀 / childPrefixes 前缀）。
+ * U22 上收：labelRes（安卓资源 id）改为共享文案常量（工程 UI 文案统一中文硬编码，
+ * 与 commonMain 各 Page 层一致，避免引入 CMP 资源基建）。
  */
 enum class NavDestination(
     val route: String,
-    @StringRes val labelRes: Int,
+    val label: String,
     /** Web 层同款语义的图标（括号内为 Tabler 原名） */
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     /** 子路由前缀（对照 Web 层 NavigationItem.childPrefixes） */
     val childPrefixes: List<String> = emptyList(),
 ) {
     // ---- 主菜单（曲库）：primaryNavItems = navItems.slice(0, 4) ----
-    Songs("songs", R.string.nav_songs, TablerIcons.MusicNote),            // music (Music)
-    Albums("albums", R.string.nav_albums, TablerIcons.Album,              // albums (Disc)
+    Songs("songs", "歌曲", TablerIcons.MusicNote),            // music (Music)
+    Albums("albums", "专辑", TablerIcons.Album,               // albums (Disc)
         childPrefixes = listOf(DetailRoutes.ALBUM_DETAIL_PREFIX)),
-    Artists("artists", R.string.nav_artists, TablerIcons.Person,          // user (MicVocal)
+    Artists("artists", "艺术家", TablerIcons.Person,          // user (MicVocal)
         childPrefixes = listOf(DetailRoutes.ARTIST_DETAIL_PREFIX)),
-    Playlists("playlists", R.string.nav_playlists, TablerIcons.QueueMusic, // playlist (ListMusic)
+    Playlists("playlists", "歌单", TablerIcons.QueueMusic,    // playlist (ListMusic)
         childPrefixes = listOf("playlist/")),
 
     // ---- 次菜单（工具）：secondaryNavItems = navItems.slice(4) ----
-    Scrape("scrape", R.string.nav_scrape, TablerIcons.Checklist),         // listCheck
-    Sources("sources", R.string.nav_sources, TablerIcons.Folder,          // broadcast (Web 层映射 Folder)
+    Scrape("scrape", "刮削", TablerIcons.Checklist),          // listCheck
+    Sources("sources", "音源", TablerIcons.Folder,            // broadcast (Web 层映射 Folder)
         childPrefixes = listOf("sources/webdav")),
-    Settings("settings", R.string.nav_settings, TablerIcons.Settings),    // settings
+    Settings("settings", "设置", TablerIcons.Settings),       // settings
 
     // ---- 非 tabs 导航项（播放页/队列页/刮削审核页，不出现在侧边栏）----
-    NowPlaying("now-playing", R.string.nav_now_playing, TablerIcons.MusicNote),
-    Queue("queue", R.string.nav_queue, TablerIcons.QueueMusic),
+    NowPlaying("now-playing", "正在播放", TablerIcons.MusicNote),
+    Queue("queue", "播放队列", TablerIcons.QueueMusic),
     /**
      * 单曲刮削审核页（Tagger 式就地审核）。真实导航 route 带参数：
      * `"scrape_review?songId={songId}&queue={queue}"`（songId 必传、queue 可选逗号分隔），
      * 见 [DetailRoutes.scrapeReview] 与 MusesApp 的 composable 声明。
      */
-    ScrapeReview("scrape_review", R.string.nav_scrape_review, TablerIcons.Checklist),
+    ScrapeReview("scrape_review", "刮削审核", TablerIcons.Checklist),
     ;
 
     /** 对照 TabsPage.vue 的 isNavActive(item) */

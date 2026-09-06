@@ -71,12 +71,12 @@ dependencies {
     implementation(project(":feature:playlist"))
     implementation(project(":feature:player"))
     implementation(project(":feature:sources"))
+    // U22：应用壳（MusesApp/TabsLayout/SettingsScreen + CMP Navigation 导航）双端共享
+    implementation(project(":feature:shell"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    // U18：CMP Navigation 试点——与 androidx.navigation.compose API 同构，android 变体委托 androidx 构件
-    implementation(libs.jetbrains.navigation.compose)
 
     // Compose
     implementation(platform(libs.compose.bom))
@@ -91,7 +91,6 @@ dependencies {
     implementation(libs.koin.core)
     implementation(libs.koin.android)
     implementation(libs.koin.compose.viewmodel)
-    implementation(libs.koin.androidx.compose.navigation)
 
     // WorkManager（ScanWorker 为 KoinComponent 懒注入，见 P2a R3）
     implementation(libs.work.runtime.ktx)

@@ -39,6 +39,9 @@ include(":feature:player")
 include(":feature:playlist")
 include(":feature:sources")
 
+// U22：应用壳（MusesApp/TabsLayout/MainViewModel/SettingsScreen 双端共享，CMP Navigation）
+include(":feature:shell")
+
 // P3-S2：桌面播放端口纯 JVM 模块（VLCJ 只进本模块；composeApp 三屏/S4 打包另起任务）
 include(":desktop")
 

@@ -1,11 +1,5 @@
 package com.muses.player.navigation
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,21 +14,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import org.koin.compose.viewmodel.koinViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import org.koin.compose.viewmodel.koinViewModel
+import androidx.compose.ui.unit.dp
 import com.muses.player.core.data.dao.SongDao
+import com.muses.player.core.data.db.SongTags
 import com.muses.player.core.data.mapper.toDomain
-import com.muses.player.core.media.playback.PlayerConnection
+import com.muses.player.core.data.repository.SongRepository
+import com.muses.player.core.playback.PlaybackMeta
+import com.muses.player.core.playback.PlaybackPort
+import com.muses.player.core.ui.components.MiniPlayerBar
+import com.muses.player.feature.shell.platform.PermissionsEffect
+import com.muses.player.feature.shell.platform.ShellBackHandler
 import com.muses.player.feature.library.AlbumDetailScreen
 import com.muses.player.feature.library.AlbumsPage
 import com.muses.player.feature.library.ArtistDetailScreen
@@ -47,12 +42,12 @@ import com.muses.player.feature.playlist.PlaylistsPage
 import com.muses.player.feature.sources.SourcesScreen
 import com.muses.player.feature.sources.WebDavBrowseScreen
 import com.muses.player.feature.sources.WebDavFormScreen
-import com.muses.player.R
 import com.muses.player.settings.SettingsScreen
-import com.muses.player.core.ui.components.MiniPlayerBar
-import com.muses.player.core.ui.components.SaltEmpty
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -68,70 +63,78 @@ data class NowPlayingUiState(
     val coverUri: String?,
 )
 
-/** 主界面 ViewModel：管理权限、播放连接与 MiniPlayer 数据 */
+/**
+ * 主界面 ViewModel：管理播放连接与 MiniPlayer 数据（U22 上收 commonMain，
+ * 播放链经 [PlaybackPort] 端口驱动，曲库标签合并逻辑保持不变）。
+ */
 class MainViewModel constructor(
-    private val playerConnection: PlayerConnection,
+    private val playback: PlaybackPort,
     private val songDao: SongDao,
-    private val songRepository: com.muses.player.core.data.repository.SongRepository,
+    private val songRepository: SongRepository,
 ) : ViewModel() {
 
-    val isPlaying: StateFlow<Boolean> = playerConnection.isPlaying
+    val isPlaying: StateFlow<Boolean> = playback.isPlaying
 
     /**
-     * 当前曲信息：优先用 Room 的已回写标签（lazyScan 后），未回写前回退到 ExoPlayer 解析的 Player.mediaMetadata
-     *（通知栏同源，解决「通知栏有信息但底部栏仍未知」）。
-     * 关键：必须用 Player.mediaMetadata（合并动态 ID3）而非 MediaItem.mediaMetadata（静态占位）。
+     * 当前曲信息：优先用 Room 的已回写标签（lazyScan 后），未回写前回退到播放栈实时
+     * 元数据（[PlaybackMeta]，通知栏同源，解决「通知栏有信息但底部栏仍未知」）。
      * null = 无当前曲（MiniPlayer 显示空态整条，对照 `.mini-player--empty`）。
-     * 修复：改为 observeById Flow，使播放时回写后迷你条与列表一致（原 one-shot getById 不响应 DB 更新）。
      */
-    val nowPlaying: StateFlow<NowPlayingUiState?> = kotlinx.coroutines.flow.combine(
-        playerConnection.currentMediaItem,
-        playerConnection.mediaMetadata,
-        playerConnection.currentMediaItem.map { it?.mediaId }.distinctUntilChanged()
-            .flatMapLatest { id ->
-                if (id == null) flowOf(null) else songDao.observeById(id)
-            },
-    ) { mediaItem, mediaMetadata, songEntity ->
-        mediaItem?.let { item ->
-            val song = songEntity
-            // 合并 metadata 优先用 Player.mediaMetadata（动态解析），回退到 MediaItem.mediaMetadata（静态）
-            val combined = mediaMetadata ?: item.mediaMetadata
-            val metaTitle = combined.title?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-            val metaArtist = combined.artist?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-            val metaAlbum = combined.albumTitle?.toString()?.trim()?.takeIf { it.isNotEmpty() }
-            val metaCover = combined.artworkUri?.toString()
-            // 修复：已刮削字段（metaTitle/metaArtist/metaAlbum/metaCover 非空）优先库值，避免重刮削后仍显示旧文件标签
-            val title = when {
-                song == null -> metaTitle ?: "未知歌曲"
-                song.metaTitle != null -> song.title
-                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaTitle ?: song.title
-                else -> song.title
+    val nowPlaying: StateFlow<NowPlayingUiState?> = combine(
+        playback.currentSongId,
+        playback.currentMeta,
+    ) { songId, meta -> songId to meta }
+        .flatMapLatest { (songId, meta) ->
+            if (songId == null) {
+                flowOf(null)
+            } else {
+                // 修复：改为 observeById Flow，使播放时回写后迷你条与列表一致（原 one-shot 不响应 DB 更新）
+                songDao.observeById(songId).map { song -> mergeNowPlaying(songId, song, meta) }
             }
-            val artist = when {
-                song == null -> metaArtist ?: "未知艺术家"
-                song.metaArtist != null -> song.artist ?: "未知艺术家"
-                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaArtist ?: song.artist ?: "未知艺术家"
-                else -> song.artist ?: "未知艺术家"
-            }
-            val album = when {
-                song == null -> metaAlbum ?: "未知专辑"
-                song.metaAlbum != null -> song.albumTitle ?: "未知专辑"
-                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaAlbum ?: song.albumTitle ?: "未知专辑"
-                else -> song.albumTitle ?: "未知专辑"
-            }
-            val cover = when {
-                song == null -> metaCover
-                song.metaCover != null -> song.coverUri
-                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaCover ?: song.coverUri
-                else -> song.coverUri
-            }
-            NowPlayingUiState(
-                title = title,
-                subtitle = "$artist - $album",
-                coverUri = cover,
-            )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private fun mergeNowPlaying(
+        songId: String?,
+        song: com.muses.player.core.data.db.SongEntity?,
+        meta: PlaybackMeta?,
+    ): NowPlayingUiState? {
+        if (songId == null) return null
+        val metaTitle = meta?.title?.trim()?.takeIf { it.isNotEmpty() }
+        val metaArtist = meta?.artist?.trim()?.takeIf { it.isNotEmpty() }
+        val metaAlbum = meta?.album?.trim()?.takeIf { it.isNotEmpty() }
+        val metaCover = meta?.coverUri
+        // 修复：已刮削字段（metaTitle/metaArtist/metaAlbum/metaCover 非空）优先库值，避免重刮削后仍显示旧文件标签
+        val title = when {
+            song == null -> metaTitle ?: "未知歌曲"
+            song.metaTitle != null -> song.title
+            song.tagsVersion < SongTags.TAGS_VERSION -> metaTitle ?: song.title
+            else -> song.title
+        }
+        val artist = when {
+            song == null -> metaArtist ?: "未知艺术家"
+            song.metaArtist != null -> song.artist ?: "未知艺术家"
+            song.tagsVersion < SongTags.TAGS_VERSION -> metaArtist ?: song.artist ?: "未知艺术家"
+            else -> song.artist ?: "未知艺术家"
+        }
+        val album = when {
+            song == null -> metaAlbum ?: "未知专辑"
+            song.metaAlbum != null -> song.albumTitle ?: "未知专辑"
+            song.tagsVersion < SongTags.TAGS_VERSION -> metaAlbum ?: song.albumTitle ?: "未知专辑"
+            else -> song.albumTitle ?: "未知专辑"
+        }
+        val cover = when {
+            song == null -> metaCover
+            song.metaCover != null -> song.coverUri
+            song.tagsVersion < SongTags.TAGS_VERSION -> metaCover ?: song.coverUri
+            else -> song.coverUri
+        }
+        return NowPlayingUiState(
+            title = title,
+            subtitle = "$artist - $album",
+            coverUri = cover,
+        )
+    }
 
     /** 存量库专辑/艺术家索引回填（幂等） */
     fun rebuildLibraryIndexes() {
@@ -141,25 +144,24 @@ class MainViewModel constructor(
     }
 
     fun connectPlayer() {
-        playerConnection.connect()
+        playback.connect()
     }
 
     fun disconnectPlayer() {
-        playerConnection.disconnect()
+        playback.disconnect()
     }
 
-    fun playPause() = playerConnection.playPause()
+    fun playPause() = playback.playPause()
 }
 
 /**
- * 主框架入口 —— P1 复刻版：TabsLayout 双形态导航（aside/drawer）+ NavHost +
- * MiniPlayer 叠加。原 M1 的 ModalNavigationDrawer/Scaffold/TopAppBar 骨架已由
- * TabsPage.vue 对照实现整体替换。
+ * 主框架入口（U22 双端共享）—— P1 复刻版：TabsLayout 双形态导航（aside/drawer）+
+ * CMP Navigation NavHost + MiniPlayer 叠加。原 M1 的 ModalNavigationDrawer/Scaffold/
+ * TopAppBar 骨架已由 TabsPage.vue 对照实现整体替换。
  */
 @Composable
 fun MusesApp() {
     val navController = rememberNavController()
-    val context = LocalContext.current
 
     val viewModel: MainViewModel = koinViewModel()
 
@@ -170,32 +172,8 @@ fun MusesApp() {
         viewModel.rebuildLibraryIndexes()
     }
 
-
-    // 请求权限
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        // 权限结果处理（静默忽略拒绝）
-    }
-
-    LaunchedEffect(Unit) {
-        val permissions = mutableListOf<String>()
-        // Android 13+ 需要 READ_MEDIA_AUDIO
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-            }
-        }
-        // Android 13+ 需要 POST_NOTIFICATIONS
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-        if (permissions.isNotEmpty()) {
-            permissionLauncher.launch(permissions.toTypedArray())
-        }
-    }
+    // 权限申请（安卓：READ_MEDIA_AUDIO/POST_NOTIFICATIONS；桌面空实现）
+    PermissionsEffect()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
@@ -205,7 +183,7 @@ fun MusesApp() {
     var showPlayerOverlay by remember { mutableStateOf(false) }
     var showQueueOverlay by remember { mutableStateOf(false) }
 
-    // 导航项组装（map 为 inline 函数，lambda 内可直接调 Composable 取 string 资源）
+    // 导航项组装
     val primaryItems = NavDestination.Primary.map { dest -> dest.toNavItem(currentRoute, navController) }
     val secondaryItems = NavDestination.Secondary.map { dest -> dest.toNavItem(currentRoute, navController) }
 
@@ -225,10 +203,8 @@ fun MusesApp() {
             bottomBar = {
                 Box(Modifier.navigationBarsPadding()) {
                     MiniPlayerBar(
-                        title = nowPlaying?.title ?: stringResource(R.string.mini_empty_title),
-                        subtitle = nowPlaying?.subtitle ?: stringResource(
-                            R.string.mini_unknown_artist,
-                        ) + " - " + stringResource(R.string.mini_unknown_album),
+                        title = nowPlaying?.title ?: "暂无播放歌曲",
+                        subtitle = nowPlaying?.subtitle ?: "未知艺术家 - 未知专辑",
                         coverUri = nowPlaying?.coverUri,
                         isPlaying = isPlaying,
                         hasSong = nowPlaying != null,
@@ -245,7 +221,7 @@ fun MusesApp() {
             AppNavHost(navController)
         }
         if (showPlayerOverlay) {
-            BackHandler { showPlayerOverlay = false }
+            ShellBackHandler { showPlayerOverlay = false }
             Box(Modifier.fillMaxSize()) {
                 val playerVm: com.muses.player.feature.player.PlayerViewModel = koinViewModel()
                 // U12：当前曲改由曲库实时流（SongEntity→领域模型），原 MediaItem 手拼字段等价
@@ -263,7 +239,7 @@ fun MusesApp() {
             }
         }
         if (showQueueOverlay) {
-            BackHandler { showQueueOverlay = false }
+            ShellBackHandler { showQueueOverlay = false }
             Box(Modifier.fillMaxSize()) {
                 QueueScreen(onClose = { showQueueOverlay = false })
             }
@@ -278,7 +254,7 @@ private fun NavDestination.toNavItem(
     navController: NavHostController,
 ): SaltNavItem = SaltNavItem(
     icon = icon,
-    label = stringResource(labelRes),
+    label = label,
     active = isActive(currentRoute),
     onClick = { navigateTo(navController, this) },
 )
@@ -315,7 +291,8 @@ private fun AppNavHost(navController: NavHostController) {
             )
         }
         composable(DetailRoutes.ALBUM_DETAIL) { backStackEntry ->
-            val albumId = backStackEntry.arguments?.getString("albumId") ?: return@composable
+            // U22：CMP Navigation 双端取参走 savedStateHandle（arguments 的 KMP SavedState 无 getString）
+            val albumId = backStackEntry.savedStateHandle.get<String>("albumId") ?: return@composable
             val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playback
             AlbumDetailScreen(
                 albumId = albumId,
@@ -325,7 +302,7 @@ private fun AppNavHost(navController: NavHostController) {
             )
         }
         composable(DetailRoutes.ARTIST_DETAIL) { backStackEntry ->
-            val artistId = backStackEntry.arguments?.getString("artistId") ?: return@composable
+            val artistId = backStackEntry.savedStateHandle.get<String>("artistId") ?: return@composable
             val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playback
             ArtistDetailScreen(
                 artistId = artistId,
@@ -340,11 +317,11 @@ private fun AppNavHost(navController: NavHostController) {
         }
         composable(route = "playlist/{playlistId}") { backStackEntry ->
             PlaylistDetailPage(
-                playlistId = checkNotNull(backStackEntry.arguments?.getString("playlistId")),
+                playlistId = checkNotNull(backStackEntry.savedStateHandle.get<String>("playlistId")),
                 onBack = { navController.popBackStack() },
             )
         }
-        // 刮削页随 M3 复刻，当前为占位空态
+        // 刮削页随 M3 复刻
         composable(NavDestination.Scrape.route) {
             com.muses.player.feature.scrape.ScrapeScreen(
                 onOpenReview = { songId ->
@@ -420,13 +397,13 @@ private fun AppNavHost(navController: NavHostController) {
                 androidx.navigation.navArgument("password") { defaultValue = "" },
             ),
         ) { backStackEntry ->
-            val args = checkNotNull(backStackEntry.arguments)
+            val args = backStackEntry.savedStateHandle
             WebDavBrowseScreen(
-                mode = args.getString("mode") ?: "multiple",
-                initialPath = args.getString("initialPath") ?: "/",
-                serverUrl = args.getString("serverUrl") ?: "",
-                username = args.getString("username") ?: "",
-                password = args.getString("password") ?: "",
+                mode = args.get<String>("mode") ?: "multiple",
+                initialPath = args.get<String>("initialPath") ?: "/",
+                serverUrl = args.get<String>("serverUrl") ?: "",
+                username = args.get<String>("username") ?: "",
+                password = args.get<String>("password") ?: "",
                 onBack = { navController.popBackStack() },
                 onConfirm = { paths ->
                     // 结果已由浏览页写入 WebDavBrowseResultHolder，这里只回退
@@ -446,7 +423,7 @@ private fun AppNavHost(navController: NavHostController) {
             )
         }
         composable(DetailRoutes.SOURCE_WEBDAV_EDIT) { backStackEntry ->
-            val sourceId = backStackEntry.arguments?.getString("sourceId")
+            val sourceId = backStackEntry.savedStateHandle.get<String>("sourceId")
             WebDavFormScreen(
                 sourceId = sourceId,
                 onBack = { navController.popBackStack() },
@@ -480,17 +457,6 @@ private fun AppNavHost(navController: NavHostController) {
         composable(NavDestination.Queue.route) {
             QueueScreen(onClose = { navController.popBackStack() })
         }
-    }
-}
-
-/** P5 前的占位页（刮削）：Salt 空态观感 */
-@Composable
-private fun PlaceholderScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        SaltEmpty(
-            title = stringResource(R.string.placeholder_page_title),
-            description = stringResource(R.string.placeholder_page_description),
-        )
     }
 }
 

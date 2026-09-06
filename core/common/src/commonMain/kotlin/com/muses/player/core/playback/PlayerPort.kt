@@ -24,6 +24,14 @@ interface PlayerPort {
     val playbackError: StateFlow<String?>
     val playerConfig: StateFlow<PlayerConfig>
 
+    /**
+     * 连接/断开播放栈（U22：MainViewModel 上收 commonMain 后的壳层生命周期钩子。
+     * 安卓 PlayerConnection 连接 MediaSessionService 覆写；桌面播放栈无连接语义，默认空实现）
+     */
+    fun connect() {}
+
+    fun disconnect() {}
+
     fun play()
     fun pause()
     fun seekTo(ms: Long)

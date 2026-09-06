@@ -1,17 +1,12 @@
 package com.muses.player.settings
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import dev.chrisbanes.haze.rememberHazeState
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,7 +14,8 @@ import com.muses.player.core.appupdate.checkLatestRelease
 import com.muses.player.core.data.log.ErrorLogStore
 import com.muses.player.core.ui.components.SettingsAboutFeedbackContent
 import com.muses.player.core.ui.components.SettingsScreen
-import com.muses.player.BuildConfig
+import com.muses.player.feature.shell.platform.AppVersionProvider
+import com.muses.player.feature.shell.platform.rememberShellPlatformActions
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -42,16 +38,26 @@ class SettingsViewModel constructor(
     suspend fun dumpLogs(): String? {
         val body = errorLogStore.dump() ?: return null
         val time = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-        return "[Muses 错误日志] v${BuildConfig.VERSION_NAME} @ $time\n$body"
+        return "[Muses 错误日志] v${versionName()} @ $time\n$body"
     }
+
+    /** 版本号经 Koin [AppVersionProvider] 注入（原 BuildConfig 仅安卓可读） */
+    private fun versionName(): String =
+        org.koin.core.context.GlobalContext.get().get<AppVersionProvider>().versionName
 }
 
+/**
+ * 设置页（U22 双端共享）：ui-shared 共享容器 + 共享「关于/反馈」扩展区块；
+ * 平台动作（浏览器/剪贴板）经 rememberShellPlatformActions 注入，版本号经
+ * Koin AppVersionProvider，报错日志同源 ErrorLogStore（桌面绑定 RingBufferErrorLogStore）。
+ */
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = koinViewModel(),
 ) {
-    val context = LocalContext.current
+    val actions = rememberShellPlatformActions()
+    val versionProvider = koinInject<AppVersionProvider>()
 
     val hazeState = rememberHazeState()
     CompositionLocalProvider(
@@ -65,14 +71,9 @@ fun SettingsScreen(
             extraContent = {
                 val latestSummary by viewModel.latestErrorSummary.collectAsState()
                 SettingsAboutFeedbackContent(
-                    versionName = BuildConfig.VERSION_NAME,
-                    onOpenUrl = { url ->
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                    },
-                    onCopyToClipboard = { text ->
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText("Muses 报错日志", text))
-                    },
+                    versionName = versionProvider.versionName,
+                    onOpenUrl = actions.openUrl,
+                    onCopyToClipboard = actions.copyToClipboard,
                     onCheckUpdate = { current -> checkLatestRelease(current) },
                     errorLogSummary = latestSummary,
                     onDumpLogs = { viewModel.dumpLogs() },

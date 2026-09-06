@@ -168,7 +168,7 @@ class PlayerConnection constructor(
         }
     }
 
-    fun connect() {
+    override fun connect() {
         if (controller != null) return
         val sessionToken = SessionToken(
             context,
@@ -192,7 +192,7 @@ class PlayerConnection constructor(
         }
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         controller?.removeListener(playerListener)
         controllerFuture?.cancel(true)
         controller = null

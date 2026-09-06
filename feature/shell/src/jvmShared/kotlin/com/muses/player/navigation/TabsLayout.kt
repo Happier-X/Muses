@@ -1,6 +1,5 @@
 package com.muses.player.navigation
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -266,7 +265,8 @@ private fun PhoneLayout(
         drawerOpen = true
     }
 
-    BackHandler(enabled = drawerOpen) { closeDrawer() }
+    // U22：系统返回关抽屉（ShellBackHandler expect/actual，安卓接 activity BackHandler）
+    com.muses.player.feature.shell.platform.ShellBackHandler(enabled = drawerOpen) { closeDrawer() }
 
     val drag = remember { DragSession() }
 

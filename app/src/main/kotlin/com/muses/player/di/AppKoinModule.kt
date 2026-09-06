@@ -1,5 +1,6 @@
 package com.muses.player.di
 
+import com.muses.player.BuildConfig
 import com.muses.player.core.data.di.databaseModule
 import com.muses.player.core.data.repository.repositoryModule
 import com.muses.player.core.data.tag.tagModule
@@ -18,15 +19,19 @@ import com.muses.player.feature.scrape.scrapeFeatureModule
 // 绑定安卓扫描端口（MediaStore/WebDAV 扫描器）
 import com.muses.player.feature.sources.sourcesCoreModule
 import com.muses.player.feature.sources.sourcesPlatformModule
-import com.muses.player.navigation.MainViewModel
-import com.muses.player.settings.SettingsViewModel
-import org.koin.core.module.dsl.viewModel
+// U22：壳层 VM（MainViewModel/SettingsViewModel）装配移入 :feature:shell shellModule；
+// app 侧仅保留平台绑定（版本号注入共享壳）
+import com.muses.player.feature.shell.di.shellModule
+import com.muses.player.feature.shell.platform.AppVersionProvider
 import org.koin.dsl.module
 
-/** app 层 ViewModel 装配（P2a Hilt→Koin：MainViewModel + SettingsViewModel）。 */
-val appModule = module {
-    viewModel { MainViewModel(get(), get(), get()) }
-    viewModel { SettingsViewModel(get()) }
+/** app 平台绑定（U22）：BuildConfig 版本号注入共享壳（桌面侧由 DesktopRuntime 同源绑定）。 */
+val appPlatformModule = module {
+    single<AppVersionProvider> {
+        object : AppVersionProvider {
+            override val versionName: String = BuildConfig.VERSION_NAME
+        }
+    }
 }
 
 /** 全量模块聚合：`MusesApplication.startKoin` 唯一入口（P2a design §3）。 */
@@ -45,5 +50,6 @@ val appModules = listOf(
     scrapeFeatureModule,
     sourcesPlatformModule,
     sourcesCoreModule,
-    appModule,
+    shellModule,
+    appPlatformModule,
 )
