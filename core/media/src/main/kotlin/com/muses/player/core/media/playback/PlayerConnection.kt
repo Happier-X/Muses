@@ -13,64 +13,104 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import com.muses.player.core.media.scanner.CoverCacheWriter
+import com.muses.player.core.data.mapper.toDomain
 import com.muses.player.core.model.SourceType
+import com.muses.player.core.model.playback.PlayerConfig
+import com.muses.player.core.model.playback.RepeatMode
+import com.muses.player.core.playback.PlaybackPort
 import com.muses.player.core.webdav.WebDavAudioCache
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 
 /**
  * 播放连接：经 MediaController 连接 PlaybackService，
  * 暴露播放状态 Flow 供 ViewModel 消费。
+ *
+ * U12：实现 commonMain [PlaybackPort]（UI 全量面）——commonMain 的 PlayerViewModel
+ * 经端口驱动双端播放栈；读侧派生流（currentSongId/artworkUri/queueSongIds/playerConfig）
+ * 由内部 Media3 StateFlow 映射。
  */
 class PlayerConnection constructor(
     private val context: Context,
     private val recoveryController: PlaybackRecoveryController,
     private val webDavCache: WebDavAudioCache,
-) {
+    private val songDao: com.muses.player.core.data.dao.SongDao,
+) : PlaybackPort {
 
     /** 最近一次播放失败的安全文案；用户主动操作后清空（P4 播放页消费） */
-    val playbackError: StateFlow<String?> = recoveryController.playbackError
+    override val playbackError: StateFlow<String?> = recoveryController.playbackError
 
     /** 清除限流/播放错误（播放页「重试」/关闭按钮消费） */
-    fun clearPlaybackError() = recoveryController.clearError()
+    override fun clearPlaybackError() = recoveryController.clearError()
 
     /** @deprecated 使用 [clearPlaybackError] */
     fun clearError() = clearPlaybackError()
 
     /** 重置恢复链 attempted 集合（限流重试等场景） */
-    fun resetRecovery() = recoveryController.reset()
+    override fun resetRecovery() = recoveryController.reset()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private val _currentMediaItem = MutableStateFlow<MediaItem?>(null)
     val currentMediaItem: StateFlow<MediaItem?> = _currentMediaItem.asStateFlow()
 
+    // U12 端口派生：当前曲 id（commonMain 侧不感知 MediaItem；syncState 同步维护）
+    private val _currentSongId = MutableStateFlow<String?>(null)
+    override val currentSongId: StateFlow<String?> = _currentSongId.asStateFlow()
+
     private val _mediaMetadata = MutableStateFlow<androidx.media3.common.MediaMetadata?>(null)
     val mediaMetadata: StateFlow<androidx.media3.common.MediaMetadata?> = _mediaMetadata.asStateFlow()
+
+    // U12 端口派生：兜底封面（实时 metadata.artworkUri，PlayerViewModel 粘性封面回退用）
+    private val _artworkUri = MutableStateFlow<String?>(null)
+    override val artworkUri: StateFlow<String?> = _artworkUri.asStateFlow()
 
     private val _position = MutableStateFlow(0L)
     val position: StateFlow<Long> = _position.asStateFlow()
 
     private val _duration = MutableStateFlow(0L)
-    val duration: StateFlow<Long> = _duration.asStateFlow()
+    override val duration: StateFlow<Long> = _duration.asStateFlow()
 
     private val _playbackState = MutableStateFlow(Player.STATE_IDLE)
-    val playbackState: StateFlow<Int> = _playbackState.asStateFlow()
+    override val playbackState: StateFlow<Int> = _playbackState.asStateFlow()
 
     private val _queue = MutableStateFlow<List<MediaItem>>(emptyList())
     val queue: StateFlow<List<MediaItem>> = _queue.asStateFlow()
+
+    // U12 端口派生：队列 songId 有序集（展示字段由 VM 按曲库组合）
+    private val _queueSongIds = MutableStateFlow<List<String>>(emptyList())
+    override val queueSongIds: StateFlow<List<String>> = _queueSongIds.asStateFlow()
 
     private val _shuffleModeEnabled = MutableStateFlow(false)
     val shuffleModeEnabled: StateFlow<Boolean> = _shuffleModeEnabled.asStateFlow()
 
     private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_ALL)
     val repeatMode: StateFlow<Int> = _repeatMode.asStateFlow()
+
+    // U12 端口派生：P1 的 PlayerConfig 流（repeatMode/shuffle 合一，模型枚举口径）
+    private val portScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    override val playerConfig: StateFlow<PlayerConfig> = combine(
+        _repeatMode,
+        _shuffleModeEnabled,
+    ) { repeat, shuffle ->
+        PlayerConfig(
+            repeatMode = if (repeat == Player.REPEAT_MODE_ONE) RepeatMode.ONE else RepeatMode.ALL,
+            shuffleEnabled = shuffle,
+        )
+    }.stateIn(portScope, SharingStarted.Eagerly, PlayerConfig())
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -156,11 +196,21 @@ class PlayerConnection constructor(
     }
 
     /** 从歌曲列表中选择 songId 开始播放（WebDAV 直接 HTTP 流播，标签由 ExoPlayer 解析回退显示） */
-    fun play(songId: String, songs: List<com.muses.player.core.model.Song>) {
+    override fun play(songId: String, songs: List<com.muses.player.core.model.Song>) {
         // 用户主动切歌：重置恢复链与错误状态（controller.ts 语义）
         recoveryController.reset()
         recoveryController.clearError()
         applyPlayback(songId, songs)
+    }
+
+    /** U12：P1 驱动面 enqueue——按 songId 集合重建队列并从 index 播放（详情查库后复用 applyPlayback） */
+    override fun enqueue(ids: List<String>, index: Int) {
+        portScope.launch {
+            val songs = ids.mapNotNull { id -> songDao.getById(id)?.toDomain() }
+            if (songs.isEmpty()) return@launch
+            val startId = songs.getOrNull(index)?.id ?: songs.first().id
+            applyPlayback(startId, songs)
+        }
     }
 
     private fun applyPlayback(songId: String, songs: List<com.muses.player.core.model.Song>) {
@@ -197,28 +247,28 @@ class PlayerConnection constructor(
         return webDavCache.getCachedFile(song.path)?.let { Uri.fromFile(it) } ?: Uri.parse(song.path)
     }
 
-    fun playPause() {
+    override fun playPause() {
         val player = controller ?: return
         if (player.isPlaying) player.pause() else player.play()
     }
 
-    fun seekTo(positionMs: Long) {
+    override fun seekTo(positionMs: Long) {
         controller?.seekTo(positionMs)
     }
 
     /** 选中并播放队列中第 index 项 */
-    fun playAtIndex(index: Int) {
+    override fun playAtIndex(index: Int) {
         controller?.seekTo(index, 0)
         controller?.playWhenReady = true
     }
 
     /** 移除队列中第 index 项 */
-    fun removeQueueItemAt(index: Int) {
+    override fun removeQueueItemAt(index: Int) {
         controller?.removeMediaItem(index)
     }
 
     /** 清空队列 */
-    fun clearQueueItems() {
+    override fun clearQueueItems() {
         controller?.clearMediaItems()
     }
 
@@ -244,7 +294,7 @@ class PlayerConnection constructor(
         }
     }
 
-    fun skipToNext() {
+    override fun skipToNext() {
         controller?.let { c ->
             val count = c.mediaItemCount
             if (count <= 1) { c.seekTo(0); return@let }
@@ -255,7 +305,7 @@ class PlayerConnection constructor(
         }
     }
 
-    fun skipToPrevious() {
+    override fun skipToPrevious() {
         controller?.let { c ->
             val count = c.mediaItemCount
             if (count <= 1) { c.seekTo(0); return@let }
@@ -266,8 +316,26 @@ class PlayerConnection constructor(
         }
     }
 
-    fun setRepeatMode(mode: Int) {
+    override fun setRepeatMode(mode: Int) {
         controller?.repeatMode = mode
+    }
+
+    override fun setShuffleEnabled(enabled: Boolean) = setShuffleModeEnabled(enabled)
+
+    /** U12 端口模型重载：枚举 → Media3 整型（REPEAT_MODE_OFF=0/ONE=1/ALL=2 冻结数值） */
+    override fun setRepeatMode(mode: RepeatMode) {
+        controller?.repeatMode = when (mode) {
+            RepeatMode.ONE -> Player.REPEAT_MODE_ONE
+            RepeatMode.ALL -> Player.REPEAT_MODE_ALL
+        }
+    }
+
+    override fun play() {
+        controller?.play()
+    }
+
+    override fun pause() {
+        controller?.pause()
     }
 
     fun setShuffleModeEnabled(enabled: Boolean) {
@@ -291,6 +359,10 @@ class PlayerConnection constructor(
             }
         }
         _mediaMetadata.value = meta
+        // U12 端口派生流同步（与上面 Media3 流一一对应）
+        _currentSongId.value = player.currentMediaItem?.mediaId
+        _artworkUri.value = meta.artworkUri?.toString()
+        _queueSongIds.value = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
         _position.value = player.currentPosition
         _duration.value = if (player.duration > 0) player.duration else 0L
         _playbackState.value = player.playbackState
@@ -304,7 +376,7 @@ class PlayerConnection constructor(
      * ExoPlayer 的 Player.Listener 不实时推送 position，
      * UI 需主动读取以驱动进度条。
      */
-    fun currentPosition(): Long = controller?.currentPosition ?: 0L
+    override fun currentPosition(): Long = controller?.currentPosition ?: 0L
     fun duration(): Long {
         val d = controller?.duration ?: 0L
         return if (d > 0) d else 0L

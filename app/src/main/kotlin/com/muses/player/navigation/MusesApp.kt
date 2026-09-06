@@ -33,6 +33,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.muses.player.core.data.dao.SongDao
+import com.muses.player.core.data.mapper.toDomain
 import com.muses.player.core.media.playback.PlayerConnection
 import com.muses.player.feature.library.AlbumDetailScreen
 import com.muses.player.feature.library.AlbumsPage
@@ -247,20 +248,11 @@ fun MusesApp() {
             BackHandler { showPlayerOverlay = false }
             Box(Modifier.fillMaxSize()) {
                 val playerVm: com.muses.player.feature.player.PlayerViewModel = koinViewModel()
-                val currentMediaItem by playerVm.currentMediaItem.collectAsState()
+                // U12：当前曲改由曲库实时流（SongEntity→领域模型），原 MediaItem 手拼字段等价
+                val currentSong by playerVm.currentSong.collectAsState()
                 var showEditMeta by remember { mutableStateOf(false) }
                 if (showEditMeta) {
-                    val editSong = currentMediaItem?.let { item ->
-                        com.muses.player.core.model.Song(
-                            id = item.mediaId,
-                            sourceId = "",
-                            path = item.localConfiguration?.uri?.toString() ?: "",
-                            title = item.mediaMetadata.title?.toString() ?: "未知歌曲",
-                            artist = item.mediaMetadata.artist?.toString(),
-                            album = item.mediaMetadata.albumTitle?.toString(),
-                            coverUri = item.mediaMetadata.artworkUri?.toString(),
-                        )
-                    }
+                    val editSong = currentSong?.toDomain()
                     com.muses.player.feature.scrape.EditMetaSheet(song = editSong, onDismiss = { showEditMeta = false })
                 }
                 PlayerScreen(
@@ -299,7 +291,8 @@ private fun AppNavHost(navController: NavHostController) {
         modifier = Modifier.fillMaxSize(),
     ) {
         composable(NavDestination.Songs.route) {
-            val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playerConnection
+            // U12：SongsPage（安卓 Page 层）深绑 Media3 metadata，仍取具体 PlayerConnection
+            val playerConnection = org.koin.compose.koinInject<com.muses.player.core.media.playback.PlayerConnection>()
             // M3：刮削队列入队（ScrapeQueueStore 为 @Singleton，经 koinViewModel 载体注入）
             val scrapeVm: com.muses.player.feature.scrape.ScrapeQueueAccessViewModel = koinViewModel()
             SongsPage(
@@ -323,7 +316,7 @@ private fun AppNavHost(navController: NavHostController) {
         }
         composable(DetailRoutes.ALBUM_DETAIL) { backStackEntry ->
             val albumId = backStackEntry.arguments?.getString("albumId") ?: return@composable
-            val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playerConnection
+            val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playback
             AlbumDetailScreen(
                 albumId = albumId,
                 onBack = { navController.popBackStack() },
@@ -333,7 +326,7 @@ private fun AppNavHost(navController: NavHostController) {
         }
         composable(DetailRoutes.ARTIST_DETAIL) { backStackEntry ->
             val artistId = backStackEntry.arguments?.getString("artistId") ?: return@composable
-            val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playerConnection
+            val playerConnection = koinViewModel<com.muses.player.feature.player.PlayerViewModel>().playback
             ArtistDetailScreen(
                 artistId = artistId,
                 onBack = { navController.popBackStack() },
@@ -468,20 +461,11 @@ private fun AppNavHost(navController: NavHostController) {
         composable(NavDestination.NowPlaying.route) {
             // M3：编辑歌曲信息弹窗宿主（当前曲经 PlayerViewModel 反查）
             val playerVm: com.muses.player.feature.player.PlayerViewModel = koinViewModel()
-            val currentMediaItem by playerVm.currentMediaItem.collectAsState()
+            // U12：当前曲改由曲库实时流（SongEntity→领域模型），原 MediaItem 手拼字段等价
+            val currentSong by playerVm.currentSong.collectAsState()
             var showEditMeta by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
             if (showEditMeta) {
-                val editSong = currentMediaItem?.let { item ->
-                    com.muses.player.core.model.Song(
-                        id = item.mediaId,
-                        sourceId = "",
-                        path = item.localConfiguration?.uri?.toString() ?: "",
-                        title = item.mediaMetadata.title?.toString() ?: "未知歌曲",
-                        artist = item.mediaMetadata.artist?.toString(),
-                        album = item.mediaMetadata.albumTitle?.toString(),
-                        coverUri = item.mediaMetadata.artworkUri?.toString(),
-                    )
-                }
+                val editSong = currentSong?.toDomain()
                 com.muses.player.feature.scrape.EditMetaSheet(
                     song = editSong,
                     onDismiss = { showEditMeta = false },

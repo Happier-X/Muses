@@ -34,6 +34,10 @@ interface SongDao {
     @Query("SELECT * FROM songs WHERE id = :id")
     fun observeById(id: String): Flow<SongEntity?>
 
+    /** U12：按 id 集合批量观测（播放队列行展示字段组合用，Room IN 参数上限 999 足够队列长度） */
+    @Query("SELECT * FROM songs WHERE id IN (:ids)")
+    fun observeByIds(ids: List<String>): Flow<List<SongEntity>>
+
     @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' COLLATE NOCASE ORDER BY title COLLATE NOCASE ASC")
     suspend fun searchByTitle(query: String): List<SongEntity>
 

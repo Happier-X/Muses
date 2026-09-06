@@ -21,6 +21,8 @@ val playbackModule = module {
     // P2a 补漏：Hilt 时代靠 @Inject 构造自动提供，Koin 需显式声明
     singleOf(::PlaybackRecoveryController)
     singleOf(::PlayerConnection)
+    // U12：端口绑定——commonMain 的 PlayerViewModel 经 PlaybackPort 消费（P1 驱动面 + U12 UI 全量面）
+    single<com.muses.player.core.playback.PlaybackPort> { get<PlayerConnection>() }
     singleOf(::LocalLibraryScanner)
     singleOf(::WebDavLibraryScanner)
 

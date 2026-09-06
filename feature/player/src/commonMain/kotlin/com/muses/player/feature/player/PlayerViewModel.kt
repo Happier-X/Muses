@@ -4,17 +4,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.muses.player.core.data.dao.SongDao
 import com.muses.player.core.lyrics.model.LyricsDocument
-import com.muses.player.core.media.playback.PlayerConnection
+import com.muses.player.core.model.playback.RepeatMode
+import com.muses.player.core.playback.PlaybackPort
+import com.muses.player.core.playback.PlaybackStates
 import com.muses.player.feature.player.lyric.AmllLyricLine
 import com.muses.player.feature.player.lyric.LyricsParser
 import com.muses.player.feature.player.lyric.toAmllLyricLines
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -22,24 +25,57 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** 播放页 ViewModel：包装 PlayerConnection 的 Flow 并提供位置轮询 */
+/** 播放队列行（U12：端口只暴露 songId 有序集，展示字段由 VM 按曲库组合） */
+data class QueueRow(
+    val songId: String,
+    val title: String,
+    val artist: String?,
+)
+
+/** 播放页 ViewModel：经 [PlaybackPort] 包装双端播放栈并提供位置轮询 */
+@OptIn(ExperimentalCoroutinesApi::class)
 class PlayerViewModel constructor(
-    val playerConnection: PlayerConnection,
+    val playback: PlaybackPort,
     private val songDao: SongDao,
 ) : ViewModel() {
 
-    val isPlaying: StateFlow<Boolean> = playerConnection.isPlaying
-    val currentMediaItem = playerConnection.currentMediaItem
+    val isPlaying: StateFlow<Boolean> = playback.isPlaying
+    /** 当前曲 id（U12：commonMain 不感知 MediaItem，队列/歌词均以 songId 口径） */
+    val currentSongId: StateFlow<String?> = playback.currentSongId
     /** 播放失败可观测：限流 429 展示「触发限流，稍后重试」并提供重试入口 */
-    val playbackError: StateFlow<String?> = playerConnection.playbackError
+    val playbackError: StateFlow<String?> = playback.playbackError
     // 时长兜底：播放器未就绪时 duration 为 0，取 DB 的 durationMs 避免冷启动重开进度为 0
     private val _dbDuration = MutableStateFlow(0L)
-    val duration: StateFlow<Long> = kotlinx.coroutines.flow.combine(playerConnection.duration, _dbDuration) { playerDur, dbDur ->
+    val duration: StateFlow<Long> = combine(playback.duration, _dbDuration) { playerDur, dbDur ->
         if (playerDur > 0) playerDur else dbDur
     }.stateIn(viewModelScope, SharingStarted.Eagerly, 0L)
-    val repeatMode: StateFlow<Int> = playerConnection.repeatMode
-    val shuffleModeEnabled: StateFlow<Boolean> = playerConnection.shuffleModeEnabled
-    val queue: StateFlow<List<androidx.media3.common.MediaItem>> = playerConnection.queue
+
+    /** 循环/随机模式：Int 口径保持旧 UI 签名（PlayerControls 参数不变），数值冻结见 [PlaybackStates] */
+    val repeatMode: StateFlow<Int> = playback.playerConfig
+        .map { if (it.repeatMode == RepeatMode.ONE) PlaybackStates.REPEAT_MODE_ONE else PlaybackStates.REPEAT_MODE_ALL }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, PlaybackStates.REPEAT_MODE_ALL)
+    val shuffleModeEnabled: StateFlow<Boolean> = playback.playerConfig
+        .map { it.shuffleEnabled }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** 队列展示行（songId → 曲库 title/artist 组合，保持队列顺序） */
+    val queueRows: StateFlow<List<QueueRow>> = playback.queueSongIds
+        .flatMapLatest { ids ->
+            if (ids.isEmpty()) flowOf(emptyList())
+            else songDao.observeByIds(ids).map { list ->
+                val byId = list.associateBy { it.id }
+                ids.mapNotNull { id -> byId[id]?.let { e -> QueueRow(e.id, e.title, e.artist) } }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** 当前曲实体（曲库实时流；播放页标题/艺术家展示，metaTitle/metaArtist 刮削优先） */
+    val currentSong: StateFlow<com.muses.player.core.data.db.SongEntity?> = playback.currentSongId
+        .flatMapLatest { songId ->
+            if (songId == null) flowOf(null)
+            else songDao.observeById(songId)
+        }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     // 位置轮询（约 500ms 一次）
     private val _position = MutableStateFlow(0L)
@@ -53,54 +89,49 @@ class PlayerViewModel constructor(
         viewModelScope.launch {
             while (true) {
                 if (!_isSeeking.value) {
-                    _position.value = playerConnection.currentPosition()
+                    _position.value = playback.currentPosition()
                 }
                 delay(500)
             }
         }
     }
 
-    fun playPause() = playerConnection.playPause()
+    fun playPause() = playback.playPause()
 
-    fun clearQueue() = playerConnection.clearQueueItems()
+    fun clearQueue() = playback.clearQueueItems()
 
-    fun playAtIndex(index: Int) = playerConnection.playAtIndex(index)
+    fun playAtIndex(index: Int) = playback.playAtIndex(index)
 
-    fun removeQueueItemAt(index: Int) = playerConnection.removeQueueItemAt(index)
+    fun removeQueueItemAt(index: Int) = playback.removeQueueItemAt(index)
 
-    fun skipToNext() = playerConnection.skipToNext()
+    fun skipToNext() = playback.skipToNext()
 
-    fun skipToPrevious() = playerConnection.skipToPrevious()
+    fun skipToPrevious() = playback.skipToPrevious()
 
-    fun seekTo(positionMs: Long) = playerConnection.seekTo(positionMs)
+    fun seekTo(positionMs: Long) = playback.seekTo(positionMs)
 
     /** 限流后用户手动重试：清错误并重置恢复链后重播当前曲（无队列上下文则仅清错） */
     fun retryPlayback() {
-        val currentId = playerConnection.currentMediaItem.value?.mediaId ?: run {
-            playerConnection.clearPlaybackError()
+        val currentId = playback.currentSongId.value ?: run {
+            playback.clearPlaybackError()
             return
         }
-        playerConnection.clearPlaybackError()
+        playback.clearPlaybackError()
         // 重置恢复链 attempted 集合，避免重试后再次失败跳过候选异常
-        playerConnection.resetRecovery()
-        playerConnection.playAtIndex(playerConnection.queue.value.indexOfFirst { it.mediaId == currentId }.takeIf { it >= 0 } ?: 0)
+        playback.resetRecovery()
+        playback.playAtIndex(playback.queueSongIds.value.indexOf(currentId).takeIf { it >= 0 } ?: 0)
     }
 
-    fun clearPlaybackError() = playerConnection.clearPlaybackError()
-
-    fun setRepeatMode(mode: Int) = playerConnection.setRepeatMode(mode)
-
-    fun setShuffleModeEnabled(enabled: Boolean) = playerConnection.setShuffleModeEnabled(enabled)
+    fun clearPlaybackError() = playback.clearPlaybackError()
 
     /** 无参切换：基于最新 StateFlow 值，避免闭包捕获陈旧 repeatMode（连击竞态） */
     fun toggleRepeat() {
-        val cur = repeatMode.value
-        val next = if (cur == androidx.media3.common.Player.REPEAT_MODE_ONE) androidx.media3.common.Player.REPEAT_MODE_ALL else androidx.media3.common.Player.REPEAT_MODE_ONE
-        setRepeatMode(next)
+        val cur = playback.playerConfig.value.repeatMode
+        playback.setRepeatMode(if (cur == RepeatMode.ONE) RepeatMode.ALL else RepeatMode.ONE)
     }
 
     fun toggleShuffle() {
-        setShuffleModeEnabled(!shuffleModeEnabled.value)
+        playback.setShuffleEnabled(!playback.playerConfig.value.shuffleEnabled)
     }
 
     fun onSeekStart() {
@@ -133,17 +164,16 @@ class PlayerViewModel constructor(
     private val _hasTranslation = MutableStateFlow(false)
     val hasTranslation: StateFlow<Boolean> = _hasTranslation.asStateFlow()
 
-    /** 缓冲中提示位（时间行中央）：Media3 STATE_BUFFERING 直映。
-     * 与 Web 层「seek 目标超缓冲区弹 1200ms 提示」语义近似但更简单——原生无 bufferedPosition 上报链路 */
-    val isBuffering: StateFlow<Boolean> = playerConnection.playbackState
-        .map { it == androidx.media3.common.Player.STATE_BUFFERING }
+    /** 缓冲中提示位（时间行中央）：STATE_BUFFERING 直映（状态整型口径冻结，双端同值） */
+    val isBuffering: StateFlow<Boolean> = playback.playbackState
+        .map { it == PlaybackStates.STATE_BUFFERING }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** 翻译开关：切换时置空 translated/roman 后重新 toJson 注入（复刻 Web 层 #25 语义） */
     private val _translationEnabled = MutableStateFlow(true)
     val translationEnabled: StateFlow<Boolean> = _translationEnabled.asStateFlow()
 
-    /** 歌词进度：~100ms 节流轮询 + 播完鍗制 min(position, 末句 end)，规避播完全行失活模糊 */
+    /** 歌词进度：~100ms 节流轮询 + 播完钳制 min(position, 末句 end)，规避播完全行失活模糊 */
     private val _lyricPosition = MutableStateFlow(0L)
     val lyricPosition: StateFlow<Long> = _lyricPosition.asStateFlow()
 
@@ -158,20 +188,17 @@ class PlayerViewModel constructor(
     }
 
     /** 观察当前曲变化 → 订阅 Room 实时更新歌词/封面 → 解析映射并发布 payload */
-    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private fun observeCurrentSong() {
         viewModelScope.launch {
-            playerConnection.currentMediaItem
-                .map { it?.mediaId }
-                .distinctUntilChanged()
+            playback.currentSongId
                 .flatMapLatest { songId ->
                     if (songId == null) flowOf(null)
                     else songDao.observeById(songId)
                 }
                 .collect { songEntity ->
-                    // 兜底封面：扫描未读到内嵌封面时，回退到 Media3 实时 metadata.artworkUri
+                    // 兜底封面：扫描未读到内嵌封面时，回退到播放器实时 metadata artwork
                     // （对齐 app/NowPlayingUiState mediaMetadata 兜底链路，沉浸页封面缺失修复）
-                    val metaArtwork = playerConnection.mediaMetadata.value?.artworkUri?.toString()
+                    val metaArtwork = playback.artworkUri.value
                         ?.takeIf { it.isNotBlank() }
                     refreshLyricsWithEntity(songEntity, metaArtwork)
                 }
@@ -235,12 +262,12 @@ class PlayerViewModel constructor(
     private fun startLyricPositionPolling() {
         viewModelScope.launch {
             // 冷启动立即同步一次，避免暂停态下首帧为 0
-            _lyricPosition.value = playerConnection.currentPosition().coerceAtMost(lastLineEndMs)
+            _lyricPosition.value = playback.currentPosition().coerceAtMost(lastLineEndMs)
             while (true) {
                 if (!_isSeeking.value) {
-                    val pos = playerConnection.currentPosition().coerceAtMost(lastLineEndMs)
+                    val pos = playback.currentPosition().coerceAtMost(lastLineEndMs)
                     // 播放态实时更新；暂停态仅在位置变化时更新（避免无谓写入，但保证冷启动后有值）
-                    if (playerConnection.isPlaying.value || _lyricPosition.value == 0L || pos != _lyricPosition.value) {
+                    if (playback.isPlaying.value || _lyricPosition.value == 0L || pos != _lyricPosition.value) {
                         _lyricPosition.value = pos
                     }
                 }
@@ -252,9 +279,9 @@ class PlayerViewModel constructor(
 
 /** 队列页 ViewModel */
 class QueueViewModel constructor(
-    val playerConnection: PlayerConnection,
+    val playback: PlaybackPort,
 ) : ViewModel() {
-    val queue: StateFlow<List<androidx.media3.common.MediaItem>> = playerConnection.queue
-    val currentMediaItem = playerConnection.currentMediaItem
-    val isPlaying: StateFlow<Boolean> = playerConnection.isPlaying
+    val queueSongIds: StateFlow<List<String>> = playback.queueSongIds
+    val currentSongId: StateFlow<String?> = playback.currentSongId
+    val isPlaying: StateFlow<Boolean> = playback.isPlaying
 }

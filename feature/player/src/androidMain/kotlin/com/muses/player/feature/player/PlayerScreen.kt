@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import com.muses.player.core.playback.PlaybackStates
 import com.muses.player.core.ui.icons.TablerIcons
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -59,7 +60,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.Player
+
 import coil3.compose.AsyncImage
 import org.koin.compose.viewmodel.koinViewModel
 import com.muses.player.core.ui.components.PlayerControls
@@ -101,7 +102,8 @@ fun PlayerScreen(
     onOpenEditMeta: () -> Unit = {},
 ) {
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle()
-    val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
+    val currentSong by viewModel.currentSong.collectAsStateWithLifecycle()
+    val currentSongId by viewModel.currentSongId.collectAsStateWithLifecycle()
     val position by viewModel.position.collectAsStateWithLifecycle()
     val duration by viewModel.duration.collectAsStateWithLifecycle()
     val repeatMode by viewModel.repeatMode.collectAsStateWithLifecycle()
@@ -125,9 +127,11 @@ fun PlayerScreen(
     }
     val isNarrowHeight = remember(configuration) { configuration.screenHeightDp <= 520 }
 
-    val title = currentMediaItem?.mediaMetadata?.title?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: ""
-    val artist = currentMediaItem?.mediaMetadata?.artist?.toString()?.trim() ?: ""
-    val hasSong = currentMediaItem != null && title.isNotEmpty()
+    // U12：标题/艺术家改由曲库实时流（metaTitle/metaArtist 刮削优先）；原 Media3 动态 ID3
+    // 标签与扫描标签同源，差异仅在未回写窗口期
+    val title = currentSong?.let { it.metaTitle ?: it.title }?.trim()?.takeIf { it.isNotEmpty() } ?: ""
+    val artist = currentSong?.metaArtist ?: currentSong?.artist ?: ""
+    val hasSong = currentSong != null && title.isNotEmpty()
 
     // 拖动层状态（对齐 PlayerPage.vue drag-layer）
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -894,8 +898,8 @@ private fun TabletBottomBar(
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 SaltIconButton(
                     onClick = onToggleRepeat,
-                    imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) TablerIcons.RepeatOne else TablerIcons.Repeat,
-                    contentDescription = if (repeatMode == Player.REPEAT_MODE_ONE) "单曲循环" else "列表循环",
+                    imageVector = if (repeatMode == PlaybackStates.REPEAT_MODE_ONE) TablerIcons.RepeatOne else TablerIcons.Repeat,
+                    contentDescription = if (repeatMode == PlaybackStates.REPEAT_MODE_ONE) "单曲循环" else "列表循环",
                     tint = Color.White.copy(alpha = 0.8f),
                 )
                 SaltIconButton(
@@ -988,9 +992,9 @@ fun QueueScreen(
     modifier: Modifier = Modifier,
     viewModel: PlayerViewModel = koinViewModel(),
 ) {
-    val queue by viewModel.queue.collectAsStateWithLifecycle()
-    val currentMediaItem by viewModel.currentMediaItem.collectAsStateWithLifecycle()
-    val currentIndex = queue.indexOfFirst { it.mediaId == currentMediaItem?.mediaId }
+    val queue by viewModel.queueRows.collectAsStateWithLifecycle()
+    val currentId by viewModel.currentSongId.collectAsStateWithLifecycle()
+    val currentIndex = queue.indexOfFirst { it.songId == currentId }
 
     Column(
         modifier = modifier.fillMaxSize().background(LocalSaltColors.current.surface),
@@ -1019,7 +1023,7 @@ fun QueueScreen(
             val surfaceVariant = salt.surfaceVariant
             val hairline = salt.hairline
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
-                itemsIndexed(queue, key = { _, item -> item.mediaId }) { index, item ->
+                itemsIndexed(queue, key = { _, item -> item.songId }) { index, item ->
                     val isCurrent = index == currentIndex
                     Box(
                         Modifier.background(if (isCurrent) surfaceVariant else Color.Transparent).drawBehind {
@@ -1031,8 +1035,8 @@ fun QueueScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(item.mediaMetadata.title?.toString() ?: "未知歌曲", color = salt.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(item.mediaMetadata.artist?.toString() ?: "未知歌手", color = salt.text2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.title, color = salt.text, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.artist ?: "未知歌手", color = salt.text2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Text((index + 1).toString(), color = salt.text2, fontSize = 13.sp)
                             Spacer(Modifier.width(12.dp))
