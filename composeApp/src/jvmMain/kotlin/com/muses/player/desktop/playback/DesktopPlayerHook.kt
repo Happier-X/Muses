@@ -7,12 +7,16 @@ import com.muses.player.core.lyrics.LyricsMatcher
 import com.muses.player.core.model.lyrics.OnlineLyricsFailReason
 import com.muses.player.core.model.lyrics.OnlineLyricsMatchResult
 import com.muses.player.core.model.lyrics.OnlineLyricsQuery
+import com.muses.player.core.model.scrape.LyricsSource
 import com.muses.player.feature.player.lyric.LyricsParser
-import com.muses.player.feature.player.lyric.AmllLyricLine
-import com.muses.player.feature.player.lyric.toAmllLyricLines
 import com.muses.player.desktop.DesktopScrapeGraph
 import com.muses.player.desktop.cache.DesktopWebDavAudioCache
 import com.muses.player.desktop.di.DesktopContainer
+import com.muses.player.core.model.Song
+import com.muses.player.core.model.playback.PlayerConfig
+import com.muses.player.core.model.playback.RepeatMode
+import com.muses.player.core.playback.PlaybackPort
+import com.muses.player.core.playback.PlaybackStates
 import com.muses.player.desktop.playback.JvmPlayerPort
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -26,27 +30,15 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 播放页歌词态（任务 09-05-desktop-player-lyrics Y2/Y3）。
- *
- * - [lines]：解析后的歌词行（SimpleLyricsPanel 渲染入参）；
- * - [format]：歌词格式（库字段 lyricsFormat / 在线命中 format.wire）；
- * - [source]：歌词来源；[DesktopLyricsState.SOURCE_LIBRARY] 表示库内歌词（刮削写回），
- *   其余为在线命中源 wire 名（amll/kw/tx/wy/kg/mg/lrclib）；null 表示无歌词。
+ * 播放页在线歌词搜索态（Y3→U13）：无库歌词时按钮触发，命中后写回曲库
+ * （lyrics/lyricsFormat/lyricsSource=online，对齐安卓刮削写回语义），
+ * 展示交由曲库实时流（共享 PlayerViewModel 的解析链自动重解析）。
  */
-data class DesktopLyricsState(
-    val lines: List<AmllLyricLine> = emptyList(),
-    val format: String? = null,
-    val source: String? = null,
-) {
-    companion object {
-        const val SOURCE_LIBRARY = "library"
-    }
-}
-
-/** 播放页在线歌词搜索态（Y3）：无库歌词时按钮触发，命中后直接展示（不自动落库） */
 sealed interface DesktopLyricsSearchState {
     data object Idle : DesktopLyricsSearchState
     data object Searching : DesktopLyricsSearchState
+    /** 命中并已写回曲库（source = 命中源 wire 名） */
+    data class Done(val source: String) : DesktopLyricsSearchState
     data class Failed(val message: String) : DesktopLyricsSearchState
 }
 
@@ -57,13 +49,13 @@ sealed interface DesktopLyricsSearchState {
  * - 播放：playerPort.enqueue/play；
  * - 扫描：S3b 最小版——按音源 URL 做 PROPFIND 列表并入库（复用 core:webdav Ktor 客户端语义）。
  *   完整扫描（标签解析/增量）随 S5 回归后补，首版只保证建库/扫库/播放链路可用。
- * - 歌词（09-05-desktop-player-lyrics Y2/Y3）：currentSongId 变化 → 读库 lyrics/lyricsFormat
- *   → [LyricsParser.parseDocument] → [lyrics] StateFlow；无库歌词时 [searchOnlineLyrics]
- *   走 DesktopScrapeGraph 的 LyricsMatcher（AMLL+五源+LRCLIB）补充，命中仅内存展示不写库。
+ * - 歌词（U13 对齐安卓）：展示链收归曲库字段——共享 PlayerViewModel 经 SongDao 实时流解析
+ *   （与安卓刮削写回同源）；[searchOnlineLyrics] 命中后写回曲库
+ *   （lyrics/lyricsFormat/lyricsSource=online），原内存展示链已删除。
  */
 class DesktopPlayerHook(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
-) {
+) : PlaybackPort {
     private val db: MusesDatabase by lazy { DesktopContainer.database() }
     private val cache: DesktopWebDavAudioCache by lazy { DesktopContainer.audioCache() }
 
@@ -79,10 +71,10 @@ class DesktopPlayerHook(
     val status: StateFlow<String> = _status.asStateFlow()
 
     private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
+    override val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
     private val _currentSongId = MutableStateFlow<String?>(null)
-    val currentSongId: StateFlow<String?> = _currentSongId.asStateFlow()
+    override val currentSongId: StateFlow<String?> = _currentSongId.asStateFlow()
 
     private val _positionMs = MutableStateFlow(0L)
     val positionMs: StateFlow<Long> = _positionMs.asStateFlow()
@@ -90,26 +82,38 @@ class DesktopPlayerHook(
     private val _durationMs = MutableStateFlow(0L)
     val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
+    // ── U12 端口面（PlaybackPort）：与安卓 PlayerConnection 同契约，托盘/SMTC/共享组件统一消费 ──
+
+    override val duration: StateFlow<Long> = _durationMs.asStateFlow()
+
+    /** 播放状态整型（与 Media3 STATE_* 冻结同值，bridge 自 JvmPlayerPort） */
+    private val _playbackState = MutableStateFlow(PlaybackStates.STATE_IDLE)
+    override val playbackState: StateFlow<Int> = _playbackState.asStateFlow()
+
+    /** 循环/随机配置（bridge 自 JvmPlayerPort.playerConfig） */
+    private val _playerConfig = MutableStateFlow(PlayerConfig())
+    override val playerConfig: StateFlow<PlayerConfig> = _playerConfig.asStateFlow()
+
+    /** 兜底封面：桌面无实时 metadata 封面流，恒空（TODO：VLCJ cover art 桥接） */
+    private val _artworkUri = MutableStateFlow<String?>(null)
+    override val artworkUri: StateFlow<String?> = _artworkUri.asStateFlow()
+
+    /** 播放失败文案（bridge 自 JvmPlayerPort.playbackError；桌面错误仅提示不阻断） */
+    private val _playbackError = MutableStateFlow<String?>(null)
+    override val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
+
+    /** 当前队列（play/enqueue 时记录；桌面播放语义 = 列表整体入队） */
+    private val _queueSongIds = MutableStateFlow<List<String>>(emptyList())
+    override val queueSongIds: StateFlow<List<String>> = _queueSongIds.asStateFlow()
+
     private val _volume = MutableStateFlow(100)
     val volume: StateFlow<Int> = _volume.asStateFlow()
-
-    private val _lyrics = MutableStateFlow(DesktopLyricsState())
-    val lyrics: StateFlow<DesktopLyricsState> = _lyrics.asStateFlow()
 
     private val _lyricsSearch = MutableStateFlow<DesktopLyricsSearchState>(DesktopLyricsSearchState.Idle)
     val lyricsSearch: StateFlow<DesktopLyricsSearchState> = _lyricsSearch.asStateFlow()
 
-    /** 曲切换歌词加载 job（切歌取消上一个查询） */
-    private var lyricsJob: Job? = null
-
     /** 在线歌词搜索 job（重复点击/切歌取消上一个查询） */
     private var lyricsSearchJob: Job? = null
-
-    init {
-        scope.launch {
-            currentSongId.collect { id -> loadLyrics(id) }
-        }
-    }
 
     suspend fun ensurePlayer(): JvmPlayerPort {
         playerPort?.let { return it }
@@ -121,6 +125,9 @@ class DesktopPlayerHook(
         scope.launch { port.positionMs.collect { _positionMs.value = it } }
         scope.launch { port.durationMs.collect { _durationMs.value = it } }
         scope.launch { port.volume.collect { _volume.value = it } }
+        scope.launch { port.playbackState.collect { _playbackState.value = it } }
+        scope.launch { port.playerConfig.collect { _playerConfig.value = it } }
+        scope.launch { port.playbackError.collect { _playbackError.value = it } }
         return port
     }
 
@@ -143,11 +150,83 @@ class DesktopPlayerHook(
                 val index = ids.indexOf(songId).coerceAtLeast(0)
                 port.enqueue(ids, index)
                 port.play()
+                _queueSongIds.value = ids
                 _status.value = ""
             }.onFailure { e ->
                 _status.value = "播放失败：${e.message}"
             }
         }
+    }
+
+    override fun play(songId: String, songs: List<Song>) {
+        // 桌面播放语义 = 曲库列表整体入队（songs 参数忽略，见 play(songId)）
+        play(songId)
+    }
+
+    override fun playPause() = togglePlayPause()
+
+    override fun play() {
+        scope.launch { runCatching { ensurePlayer().play() } }
+    }
+
+    override fun pause() {
+        scope.launch { runCatching { ensurePlayer().pause() } }
+    }
+
+    override fun playAtIndex(index: Int) {
+        // 桌面队列重设语义：以当前队列重 enqueue 并定位（JvmPlayerPort 无 seekTo(index) 原语）
+        scope.launch {
+            runCatching {
+                val ids = _queueSongIds.value.ifEmpty { _songs.value.map { it.id } }
+                val port = ensurePlayer()
+                port.enqueue(ids, index)
+                port.play()
+                _queueSongIds.value = ids
+            }
+        }
+    }
+
+    override fun removeQueueItemAt(index: Int) {
+        // TODO：桌面无队列管理 UI，JvmPlayerPort 无移除原语；暂不生效
+    }
+
+    override fun clearQueueItems() {
+        // TODO：同上（停止播放即可近似，待队列管理接入）
+    }
+
+    override fun skipToNext() = next()
+
+    override fun skipToPrevious() = previous()
+
+    override fun currentPosition(): Long = _positionMs.value
+
+    override fun clearPlaybackError() {
+        // TODO：JvmPlayerPort 错误态暂无清除原语（桌面错误仅提示不阻断）
+    }
+
+    override fun enqueue(ids: List<String>, index: Int) {
+        scope.launch {
+            runCatching {
+                ensurePlayer().enqueue(ids, index)
+                _queueSongIds.value = ids
+            }.onFailure { e -> _status.value = "入队失败：${e.message}" }
+        }
+    }
+
+    override fun resetRecovery() {
+        // TODO：桌面无恢复链（WebDAV 限流重试链为安卓侧实现）
+    }
+
+    override fun setRepeatMode(mode: Int) {
+        scope.launch { runCatching { ensurePlayer().setRepeatMode(mode) } }
+    }
+
+    override fun setRepeatMode(mode: RepeatMode) {
+        scope.launch { runCatching { ensurePlayer().setRepeatMode(mode) } }
+    }
+
+    override fun setShuffleEnabled(enabled: Boolean) {
+        scope.launch { runCatching { ensurePlayer().setShuffleEnabled(enabled) } }
     }
 
     fun togglePlayPause() {
@@ -165,11 +244,13 @@ class DesktopPlayerHook(
         scope.launch { runCatching { ensurePlayer().next() } }
     }
 
+    // 端口别名（skipToNext/skipToPrevious 转发见上）
+
     fun previous() {
         scope.launch { runCatching { ensurePlayer().previous() } }
     }
 
-    fun seekTo(ms: Long) {
+    override fun seekTo(ms: Long) {
         scope.launch { runCatching { ensurePlayer().seekTo(ms) } }
     }
 
@@ -177,7 +258,11 @@ class DesktopPlayerHook(
         scope.launch { runCatching { ensurePlayer().setVolume(volumePercent) } }
     }
 
-    /** Y3：无库歌词时的补充链——LyricsMatcher（AMLL 优先 → 平台五源 → LRCLIB），命中仅内存展示 */
+    /**
+     * U13：无库歌词时的补充链——LyricsMatcher（AMLL 优先 → 平台五源 → LRCLIB）。
+     * 命中后写回曲库（对齐安卓刮削写回：lyrics/lyricsFormat/lyricsSource=online），
+     * 曲库实时流自动驱动共享 PlayerViewModel 重解析展示；不再有内存歌词态。
+     */
     fun searchOnlineLyrics() {
         val song = _songs.value.firstOrNull { it.id == _currentSongId.value }
         if (song == null) {
@@ -202,12 +287,22 @@ class DesktopPlayerHook(
                         if (document == null || document.lines.isEmpty()) {
                             DesktopLyricsSearchState.Failed("命中歌词解析失败")
                         } else {
-                            _lyrics.value = DesktopLyricsState(
-                                lines = document.toAmllLyricLines(),
-                                format = result.format.wire,
-                                source = result.source.wire,
-                            )
-                            DesktopLyricsSearchState.Idle
+                            // U13：写回曲库（安卓刮削写回同语义），展示交给曲库实时流
+                            runCatching {
+                                val entity = db.songDao().getById(song.id)
+                                if (entity != null) {
+                                    db.songDao().upsert(
+                                        entity.copy(
+                                            lyrics = result.text,
+                                            lyricsFormat = result.format.wire,
+                                            lyricsSource = LyricsSource.ONLINE.wire,
+                                        ),
+                                    )
+                                }
+                            }.onFailure { e ->
+                                DesktopErrorLog.log("DesktopPlayerHook", "歌词写回曲库失败", e)
+                            }
+                            DesktopLyricsSearchState.Done(result.source.wire)
                         }
                     }
                     is OnlineLyricsMatchResult.Fail -> DesktopLyricsSearchState.Failed(
@@ -230,33 +325,4 @@ class DesktopPlayerHook(
         }
     }
 
-    /** 切歌加载歌词：库字段优先（对齐安卓 song.lyrics 数据链），切歌取消上一个查询 */
-    private fun loadLyrics(songId: String?) {
-        lyricsJob?.cancel()
-        lyricsSearchJob?.cancel()
-        _lyricsSearch.value = DesktopLyricsSearchState.Idle
-        if (songId.isNullOrBlank()) {
-            _lyrics.value = DesktopLyricsState()
-            return
-        }
-        lyricsJob = scope.launch {
-            val state = try {
-                val song = db.songDao().getById(songId)
-                val document = song?.lyrics?.let { LyricsParser.parseDocument(it) }
-                DesktopLyricsState(
-                    lines = document?.toAmllLyricLines().orEmpty(),
-                    format = song?.lyricsFormat,
-                    source = if (document != null) DesktopLyricsState.SOURCE_LIBRARY else null,
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                DesktopErrorLog.log("DesktopPlayerHook", "读取歌词失败", e)
-                DesktopLyricsState()
-            }
-            if (_currentSongId.value == songId) {
-                _lyrics.value = state
-            }
-        }
-    }
 }

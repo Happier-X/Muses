@@ -38,47 +38,40 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muses.player.desktop.playback.DesktopLyricsSearchState
-import com.muses.player.desktop.playback.DesktopLyricsState
 import com.muses.player.desktop.playback.DesktopPlayerHook
+import com.muses.player.feature.player.PlayerViewModel
 import com.muses.player.feature.player.lyric.SimpleLyricsPanel
-
-/** 桌面歌词来源展示名（在线命中源 wire → 友好名） */
-private val lyricsSourceLabels = mapOf(
-    "amll" to "AMLL TTML",
-    "kw" to "酷我",
-    "tx" to "QQ音乐",
-    "wy" to "网易云",
-    "kg" to "酷狗",
-    "mg" to "咪咕",
-    "lrclib" to "LRCLIB",
-)
+import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * 桌面播放页：封面/歌词双面板（任务 09-05-desktop-player-lyrics Y2/Y3）。
- * 左侧封面 + 标题 + 进度 + 控制栏 + 音量（控制行为与 S3b 单栏版一致）；
- * 右侧歌词面板复用安卓 SimpleLyricsPanel（随播放进度滚动定位，点击行 seek），
- * 无歌词时提供「在线搜索」补充链（LyricsMatcher：AMLL+五源+LRCLIB），命中仅内存展示。
+ * 桌面播放页（U13 对齐安卓）：数据源收归共享 [PlayerViewModel]（commonMain）——
+ * 播放状态/进度/歌词解析/翻译开关与安卓同一链路（曲库 lyrics 字段实时流）；
+ * 控制经端口（playback = DesktopRuntime 单例 hook，托盘/SMTC 状态同源）。
+ * 桌面特性保留：音量（hook 直调）、「在线搜索」按钮（LyricsMatcher 命中写回曲库，
+ * 与安卓刮削写回同语义，写回后曲库实时流自动驱动 VM 重解析展示）。
  */
 @Composable
 fun PlayerScreen(playerHook: DesktopPlayerHook?) {
-    val hook = remember { playerHook ?: DesktopPlayerHook() }
-    val songs by hook.songs.collectAsState()
-    val currentSongId by hook.currentSongId.collectAsState()
-    val isPlaying by hook.isPlaying.collectAsState()
-    val positionMs by hook.positionMs.collectAsState()
-    val durationMs by hook.durationMs.collectAsState()
-    val volume by hook.volume.collectAsState()
-    val status by hook.status.collectAsState()
-    val lyrics by hook.lyrics.collectAsState()
-    val lyricsSearch by hook.lyricsSearch.collectAsState()
+    val hook = remember { playerHook ?: DesktopRuntime.playerHook() }
+    val vm: PlayerViewModel = koinViewModel()
 
-    val currentSong = songs.firstOrNull { it.id == currentSongId }
+    val isPlaying by vm.isPlaying.collectAsState()
+    val positionMs by vm.position.collectAsState()
+    val durationMs by vm.duration.collectAsState()
+    val currentSong by vm.currentSong.collectAsState()
+    val parsedLines by vm.parsedLines.collectAsState()
+    val lyricPosition by vm.lyricPosition.collectAsState()
+    val translationEnabled by vm.translationEnabled.collectAsState()
+    val hasTranslation by vm.hasTranslation.collectAsState()
+    val status by hook.status.collectAsState()
+    val lyricsSearch by hook.lyricsSearch.collectAsState()
+    val volume by hook.volume.collectAsState()
 
     Row(
         modifier = Modifier.fillMaxSize().background(Color(0xFF11111B)).padding(24.dp),
         horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        // 左面板：封面 + 控制（保持原控制区行为不变）
+        // 左面板：封面 + 控制（控制行为与 S3b 单栏版一致，改走端口）
         Column(
             modifier = Modifier.weight(0.42f).fillMaxHeight(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -104,9 +97,9 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                     fontWeight = FontWeight.Bold,
                 )
             }
-            // 标题区
+            // 标题区（曲库实时流，metaTitle/metaArtist 刮削优先，与安卓播放页同口径）
             Text(
-                text = currentSong?.title ?: "未在播放",
+                text = currentSong?.let { it.metaTitle ?: it.title } ?: "未在播放",
                 color = Color(0xFFCDD6F4),
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -114,19 +107,19 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center,
             )
-            val subtitle = listOfNotNull(currentSong?.artist, currentSong?.albumTitle)
+            val subtitle = listOfNotNull(currentSong?.metaArtist ?: currentSong?.artist, currentSong?.albumTitle)
                 .filter { it.isNotBlank() }
                 .joinToString(" - ")
             if (subtitle.isNotBlank()) {
                 Text(text = subtitle, color = Color(0xFF7F849C), fontSize = 14.sp)
             }
-            // 进度条
+            // 进度条（VM 500ms 轮询）
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 var sliderValue by remember(positionMs) { mutableStateOf(positionMs.toFloat()) }
                 Slider(
                     value = sliderValue,
                     onValueChange = { sliderValue = it },
-                    onValueChangeFinished = { hook.seekTo(sliderValue.toLong()) },
+                    onValueChangeFinished = { vm.seekTo(sliderValue.toLong()) },
                     valueRange = 0f..durationMs.coerceAtLeast(1L).toFloat(),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -135,18 +128,18 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                     Text(text = formatMs(durationMs), color = Color(0xFF7F849C), fontSize = 12.sp)
                 }
             }
-            // 控制栏
+            // 控制栏（端口）
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ControlButton("⏮", 44.dp) { hook.previous() }
+                ControlButton("⏮", 44.dp) { vm.skipToPrevious() }
                 ControlButton(if (isPlaying) "⏸" else "▶", 64.dp, primary = true) {
-                    hook.togglePlayPause()
+                    vm.playPause()
                 }
-                ControlButton("⏭", 44.dp) { hook.next() }
+                ControlButton("⏭", 44.dp) { vm.skipToNext() }
             }
-            // 音量
+            // 音量（桌面特性：端口无音量面，hook 直调）
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -174,12 +167,12 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                 .fillMaxHeight()
                 .background(Color(0xFF313244)),
         )
-        // 右面板：歌词（SimpleLyricsPanel 上收版；随进度滚动定位）
+        // 右面板：歌词（共享 VM 解析链：曲库 lyrics 字段 → AMLL 行，100ms 卡拉OK进度）
         Box(
             modifier = Modifier.weight(0.58f).fillMaxHeight(),
             contentAlignment = Alignment.Center,
         ) {
-            if (lyrics.lines.isEmpty()) {
+            if (parsedLines.isEmpty()) {
                 LyricsEmptyState(
                     hasSong = currentSong != null,
                     searchState = lyricsSearch,
@@ -187,34 +180,22 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                 )
             } else {
                 SimpleLyricsPanel(
-                    lines = lyrics.lines,
-                    positionMs = positionMs,
+                    lines = parsedLines,
+                    positionMs = lyricPosition,
                     isPlaying = isPlaying,
-                    onSeek = { hook.seekTo(it) },
+                    onSeek = { vm.seekTo(it) },
                     modifier = Modifier.fillMaxSize(),
+                    // U13：翻译开关接共享 VM 真实值（SimpleLyricsPanel 兼容参数）
+                    translationEnabled = translationEnabled,
+                    hasTranslation = hasTranslation,
+                    onToggleTranslation = { vm.toggleTranslation() },
                 )
-                // 来源标签（库内歌词不标注；在线命中标注来源）
-                val sourceTag = when (val source = lyrics.source) {
-                    null, DesktopLyricsState.SOURCE_LIBRARY -> null
-                    else -> "来源：${lyricsSourceLabels[source] ?: source}"
-                }
-                if (sourceTag != null) {
-                    Text(
-                        text = sourceTag,
-                        color = Color(0xFF7F849C),
-                        fontSize = 12.sp,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .background(Color(0xFF313244).copy(alpha = 0.6f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 4.dp),
-                    )
-                }
             }
         }
     }
 }
 
-/** 歌词空态：提示 + 在线搜索按钮（Y3；搜索中/失败态就地反馈） */
+/** 歌词空态：提示 + 在线搜索按钮（命中写回曲库；搜索中/失败/成功态就地反馈） */
 @Composable
 private fun LyricsEmptyState(
     hasSong: Boolean,
@@ -238,6 +219,14 @@ private fun LyricsEmptyState(
                 )
                 Text(text = "正在在线搜索歌词…", color = Color(0xFF7F849C), fontSize = 13.sp)
             }
+            is DesktopLyricsSearchState.Done -> {
+                // U13：命中已写回曲库；曲库实时流刷新后即切歌词展示
+                Text(
+                    text = "已从${lyricsSourceLabel(searchState.source)}写入曲库",
+                    color = Color(0xFFA6E3A1),
+                    fontSize = 13.sp,
+                )
+            }
             is DesktopLyricsSearchState.Failed -> {
                 Text(text = searchState.message, color = Color(0xFFF38BA8), fontSize = 13.sp)
                 SearchButton(enabled = hasSong, onSearch = onSearch)
@@ -247,6 +236,18 @@ private fun LyricsEmptyState(
             }
         }
     }
+}
+
+/** 在线命中源 wire → 友好名（amll/kw/tx/wy/kg/mg/lrclib） */
+private fun lyricsSourceLabel(wire: String): String = when (wire) {
+    "amll" -> "AMLL TTML"
+    "kw" -> "酷我"
+    "tx" -> "QQ音乐"
+    "wy" -> "网易云"
+    "kg" -> "酷狗"
+    "mg" -> "咪咕"
+    "lrclib" -> "LRCLIB"
+    else -> wire
 }
 
 @Composable

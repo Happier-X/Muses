@@ -12,12 +12,28 @@ import com.muses.player.core.data.repository.SongRepository
 import com.muses.player.core.data.repository.SourceRepository
 import com.muses.player.core.data.log.ErrorLogStore
 import com.muses.player.desktop.di.DesktopContainer
+import com.muses.player.desktop.playback.DesktopPlayerHook
 import com.muses.player.desktop.di.DesktopCredentials
-import com.muses.player.feature.library.libraryModule
-import com.muses.player.feature.sources.sourcesCoreModule
 import com.muses.player.core.webdav.webdavCoreModule
+import com.muses.player.feature.library.libraryModule
+import com.muses.player.feature.player.playerModule
+import com.muses.player.feature.sources.sourcesCoreModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
+
+/**
+ * 桌面运行时单例（U12）：播放 hook 唯一实例——Main 壳/托盘/SMTC/Koin 端口绑定共用，
+ * 维持「Screens 与托盘共享同一播放状态源」契约（hook 依赖 composeApp 层，不能落 :desktop）。
+ */
+object DesktopRuntime {
+
+    @Volatile private var playerHook: DesktopPlayerHook? = null
+
+    fun playerHook(): DesktopPlayerHook =
+        playerHook ?: synchronized(this) {
+            playerHook ?: DesktopPlayerHook().also { playerHook = it }
+        }
+}
 
 /**
  * U9 桌面装配：共享 ViewModel（:feature:library commonMain）依赖的 DAO/Repository
@@ -29,6 +45,8 @@ import org.koin.dsl.module
  * sourcesCoreModule（共享 WebDAV 浏览/表单 ViewModel，桌面复用共享浏览页）。
  */
 fun desktopLibraryModule(): Module = module {
+    // U12：端口绑定——共享 PlayerViewModel 经 PlaybackPort 消费桌面播放栈
+    single<com.muses.player.core.playback.PlaybackPort> { DesktopRuntime.playerHook() }
     single { DesktopContainer.database().songDao() }
     single { DesktopContainer.database().albumDao() }
     single { DesktopContainer.database().artistDao() }
@@ -47,6 +65,7 @@ fun desktopLibraryModule(): Module = module {
 val desktopAppModules: List<Module> = listOf(
     desktopLibraryModule(),
     libraryModule,
+    playerModule,
     webdavCoreModule,
     sourcesCoreModule,
 )

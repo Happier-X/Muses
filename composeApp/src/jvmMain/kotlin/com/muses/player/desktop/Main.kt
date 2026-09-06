@@ -27,8 +27,8 @@ fun main() = application {
             size = DpSize(1280.dp, 800.dp),
         )
     }
-    // 单一 hook：screens 与托盘/SMTC 共享同一播放状态源（DesktopContainer.playerPort 非单例）
-    val playerHook = remember { DesktopPlayerHook() }
+    // 单一 hook：screens 与托盘/SMTC 共享同一播放状态源（U12 收敛到 DesktopRuntime 单例）
+    val playerHook = remember { DesktopRuntime.playerHook() }
     val tray = remember {
         DesktopTray(
             isPlaying = playerHook.isPlaying,
