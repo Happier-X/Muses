@@ -151,7 +151,16 @@ internal class KtorWebDavClient constructor(
                 }
                 in 200..299 -> {
                     val bytes = response.readRawBytes()
-                    return parsePropfindResponse(bytes, response.headers["Content-Type"], url)
+                    val items = parsePropfindResponse(bytes, response.headers["Content-Type"], url)
+                    if (items.isEmpty()) {
+                        // 空列表静默即空目录页：记请求指纹便于定位服务端形状（脱敏：Authorization 只记有无）
+                        val respBody = decodeResponseBody(bytes, response.headers["Content-Type"]).take(500)
+                        errorLogStore.log(
+                            ErrorLogStore.Level.WARN, "WebDavClient",
+                            "PROPFIND url=$url parsed 0 items respContentType=${response.headers["Content-Type"]} respBody=$respBody", null,
+                        )
+                    }
+                    return items
                 }
                 else -> {
                     // P2c-diag 临时：记录 400 响应体与请求指纹定位 OpenList 拒因（脱敏：Authorization 只记有无）
@@ -566,7 +575,9 @@ internal class KtorWebDavClient constructor(
         private val HREF_VALUE =
             Regex("<(?:\\w+:)?href\\b[^>]*>(.*?)</(?:\\w+:)?href>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private val COLLECTION_TAG =
-            Regex("<(?:\\w+:)?collection\\b\\s*/?>", RegexOption.IGNORE_CASE)
+            // collection 判目录：开标签可带属性（部分服务端/网关在内联标签上重声明 xmlns），
+            // 自闭合 `<d:collection/>` 与成对 `<d:collection …></…>` 均接受
+            Regex("<(?:\\w+:)?collection\\b[^>]*(?:/>|>.*?</(?:\\w+:)?collection\\s*>)", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
         private fun PROP_TEXT(local: String) =
             Regex("<(?:\\w+:)?$local\\b[^>]*>(.*?)</(?:\\w+:)?$local>", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 

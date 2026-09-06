@@ -256,6 +256,121 @@ class KtorWebDavClientTest {
         assertEquals(null, aab.eTag)
     }
 
+    @Test
+    fun list_detects_collection_with_inline_xmlns_attr() = runTest {
+        // 部分服务端/网关在内联标签上重声明 xmlns：<collection xmlns:D="DAV:"/> 仍须判目录
+        val body = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <D:multistatus xmlns:D="DAV:">
+                <D:response>
+                    <D:href>/dav/music/</D:href>
+                    <D:propstat>
+                        <D:prop xmlns:D="DAV:">
+                            <D:resourcetype><D:collection xmlns:D="DAV:"/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+                <D:response>
+                    <D:href>/dav/music/rock/</D:href>
+                    <D:propstat>
+                        <D:prop xmlns:D="DAV:">
+                            <D:resourcetype><D:collection xmlns:D="DAV:"/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+            </D:multistatus>
+        """.trimIndent()
+        val h = Harness(multistatus(body))
+        val items = h.client.list("https://example.com/dav/music/")
+        assertEquals(1, items.size)
+        assertTrue(items.single().isDirectory)
+        assertEquals("rock", items.single().name)
+    }
+
+    @Test
+    fun list_detects_collection_in_resourcetype_wrapper() = runTest {
+        // Go 系服务端（OpenList/Alist）：判目录标记藏在 resourcetype 内层，resourcetype 标签名本身不含 collection
+        val body = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <D:multistatus xmlns:D="DAV:">
+                <D:response>
+                    <D:href>/dav/music/</D:href>
+                    <D:propstat>
+                        <D:prop>
+                            <D:displayname>music</D:displayname>
+                            <D:resourcetype><D:collection/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+                <D:response>
+                    <D:href>/dav/music/live/</D:href>
+                    <D:propstat>
+                        <D:prop>
+                            <D:displayname>live</D:displayname>
+                            <D:resourcetype><D:collection/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+                <D:response>
+                    <D:href>/dav/music/song.mp3</D:href>
+                    <D:propstat>
+                        <D:prop>
+                            <D:displayname>song.mp3</D:displayname>
+                            <D:resourcetype/>
+                            <D:getcontentlength>1024</D:getcontentlength>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+            </D:multistatus>
+        """.trimIndent()
+        val h = Harness(multistatus(body))
+        val items = h.client.list("https://example.com/dav/music/")
+        assertEquals(2, items.size)
+        assertTrue(items.first { it.name == "live" }.isDirectory)
+        assertTrue(items.none { it.name == "song.mp3" && it.isDirectory })
+    }
+
+    @Test
+    fun list_ignores_404_propstat_segment() = runTest {
+        // Apache mod_dav：200 段与 404 段并存，etag 缺失不影响目录判定
+        val body = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <D:multistatus xmlns:D="DAV:">
+                <D:response xmlns:lp1="DAV:">
+                    <D:href>/dav/music/</D:href>
+                    <D:propstat>
+                        <D:prop>
+                            <D:resourcetype><D:collection/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                    <D:propstat>
+                        <D:prop><D:getetag/></D:prop>
+                        <D:status>HTTP/1.1 404 Not Found</D:status>
+                    </D:propstat>
+                </D:response>
+                <D:response xmlns:lp1="DAV:">
+                    <D:href>/dav/music/pop/</D:href>
+                    <D:propstat>
+                        <D:prop>
+                            <D:resourcetype><D:collection/></D:resourcetype>
+                        </D:prop>
+                        <D:status>HTTP/1.1 200 OK</D:status>
+                    </D:propstat>
+                </D:response>
+            </D:multistatus>
+        """.trimIndent()
+        val h = Harness(multistatus(body))
+        val items = h.client.list("https://example.com/dav/music/")
+        assertEquals(1, items.size)
+        assertTrue(items.single().isDirectory)
+    }
+
     // ── 429 退避与限流埋点（任务 08-27-webdav-playback-429） ─────────────────
 
     @Test
