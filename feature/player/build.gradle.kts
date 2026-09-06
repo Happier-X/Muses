@@ -1,9 +1,9 @@
 // 播放 feature：KMP 双 target（android + jvm）。
-// U12 播放页 ViewModel 上收：PlayerViewModel/QueueViewModel 进 commonMain，经 commonMain
-// [PlaybackPort]（P1 驱动面 + U12 UI 全量面）驱动双端播放栈（安卓 PlayerConnection/Media3，
-// 桌面 JvmPlayerPort/VLCJ 待播放页统一时接入）；播放屏/歌词面板（AMLL 渲染、haze、
-// Android 资源字体）留 androidMain。队列展示字段由 VM 按曲库组合（QueueRow），
-// 端口只暴露 songId 有序集。形态同 :feature:library（android.kmp.library，不升级版本线）。
+// U21 播放页/歌词链全量上收 jvmShared：PlayerScreen/QueueScreen/FlowingLightBackdrop/
+// LyricsPanel（AMLL 渲染）双端一份——原生 glyph 绘制（nativeCanvas+BlurMaskFilter）重写为
+// 跨平台 TextMeasurer+Shadow 方案，SystemClock/系统分享抽 expect/actual（platform/）；
+// androidMain 仅余平台 actual。队列展示字段由 VM 按曲库组合（QueueRow），端口只暴露
+// songId 有序集。形态同 :feature:library（android.kmp.library，不升级版本线）。
 plugins {
     alias(libs.plugins.android.kmp.library)
     alias(libs.plugins.kotlin.multiplatform)
@@ -37,10 +37,22 @@ kotlin {
             implementation(libs.coil.compose)
         }
 
-        androidMain.dependencies {
-            // 播放屏/歌词面板本体（accompanist lyrics-core 映射、collectAsStateWithLifecycle）
-            implementation(libs.accompanist.lyrics.core)
-            implementation(libs.androidx.lifecycle.runtime.compose)
+        // U21：jvmShared 中间层由 jvmMain 与 androidMain 共同 dependsOn（core:common 同款模式），
+        // 播放屏/歌词面板一份代码双端编译；引用 core:common jvmShared 的 AmllLyricLine 等类型。
+        val jvmShared by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(compose.runtime)
+                implementation(compose.ui)
+                implementation(compose.foundation)
+                implementation(compose.animation)
+                implementation(compose.material3)
+                // U21：collectAsStateWithLifecycle（lifecycle 2.11 KMP 工件，双端可用）
+                implementation(libs.androidx.lifecycle.runtime.compose)
+                implementation(libs.coil.compose)
+            }
         }
+        jvmMain.get().dependsOn(jvmShared)
+        androidMain.get().dependsOn(jvmShared)
     }
 }

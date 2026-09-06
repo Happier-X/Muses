@@ -1,12 +1,5 @@
 package com.muses.player.feature.player.lyric
 
-import android.content.Context
-import android.content.Intent
-import android.graphics.BlurMaskFilter
-import android.graphics.Paint
-import android.graphics.Typeface
-import android.os.Build
-import android.os.SystemClock
 import java.text.BreakIterator
 import java.util.Locale
 import androidx.compose.animation.core.Animatable
@@ -66,7 +59,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.withTransform
@@ -79,12 +71,11 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
@@ -111,8 +102,8 @@ import com.muses.player.feature.player.lyric.AppVisibility
 import com.muses.player.feature.player.lyric.LyricsStyle
 import com.muses.player.feature.player.lyric.LocalFontFamily
 import com.muses.player.feature.player.lyric.LanTingProFontFamily
-import com.muses.player.feature.player.lyric.R
-import androidx.core.content.res.ResourcesCompat
+import com.muses.player.feature.player.platform.platformRealtimeMs
+import com.muses.player.feature.player.platform.rememberShareTextHandler
 import com.muses.player.feature.player.lyric.LyricsRenderingQuality
 import com.muses.player.feature.player.lyric.LyricAnnotationDisplayMode
 import com.muses.player.feature.player.lyric.LyricsGroupingMode
@@ -130,15 +121,19 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 /*
- * Android port of /AppleMusicLyricsView.swift + LyricPlaybackTimeline.swift
+ * Compose Multiplatform port of /AppleMusicLyricsView.swift + LyricPlaybackTimeline.swift
  * + SynchronizedLyricText.swift + LyricGlowTextRenderer.swift.
  *
  * Keep source constants here instead of "tuning by eye".  The rendering backend
  * is Compose rather than SwiftUI, but focus geometry, timing, dim/blur equations,
  * 120 ms colour hand-off, promoted current-line layout and cascade scheduling are
- * follows upstream . Cascade timing is shortened for Android's frame and
+ * follows upstream . Cascade timing is shortened for the frame and
  * blur cost so quick consecutive lines do not leave several row animations in
  * flight at the same time.
+ *
+ * U21 跨平台化：原生 glyph 绘制（nativeCanvas.drawText + BlurMaskFilter + Typeface）
+ * 重写为 TextMeasurer 单字布局 + TextStyle.Shadow 光晕/柔焦；时钟差用
+ * platformRealtimeMs() expect/actual，分享走 rememberShareTextHandler()。
  */
 private object UpstreamLyrics {
     const val FONT_SIZE_SP = 24f
@@ -217,32 +212,34 @@ fun LyricsPanel(
     active: Boolean = true,
     externalDocument: com.muses.player.core.lyrics.model.LyricsDocument? = null,
 ) {
-    val configuration = LocalConfiguration.current
-    if (allowAutomaticSkyline && configuration.screenWidthDp > configuration.screenHeightDp && SettingsRuntime.skylineEnabled) {
-        SkylineLyricsPanel(state, modifier, onInterfaceInteraction, active)
-        return
-    }
-    when (SettingsRuntime.lyricsStyle) {
-        LyricsStyle.AppleMusic -> AppleMusicLyricsPanel(
-            state,
-            modifier,
-            isInterfaceHidden,
-            onInterfaceInteraction,
-            onInterfaceVisibilityChange,
-            active,
-            externalDocument = externalDocument,
-        )
-        LyricsStyle.Eva -> EvaLyricsPanel(state, modifier, onInterfaceInteraction, active)
-        LyricsStyle.TextPV -> TextPVLyricsPanel(state, modifier, onInterfaceInteraction, active)
-        else -> AppleMusicLyricsPanel(
-            state,
-            modifier,
-            isInterfaceHidden,
-            onInterfaceInteraction,
-            onInterfaceVisibilityChange,
-            active,
-            externalDocument = externalDocument,
-        )
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier) {
+        // U21：横竖屏判定改用视口约束（原 LocalConfiguration 仅安卓可用）
+        if (allowAutomaticSkyline && maxWidth > maxHeight && SettingsRuntime.skylineEnabled) {
+            SkylineLyricsPanel(state, Modifier, onInterfaceInteraction, active)
+            return@BoxWithConstraints
+        }
+        when (SettingsRuntime.lyricsStyle) {
+            LyricsStyle.AppleMusic -> AppleMusicLyricsPanel(
+                state,
+                Modifier,
+                isInterfaceHidden,
+                onInterfaceInteraction,
+                onInterfaceVisibilityChange,
+                active,
+                externalDocument = externalDocument,
+            )
+            LyricsStyle.Eva -> EvaLyricsPanel(state, Modifier, onInterfaceInteraction, active)
+            LyricsStyle.TextPV -> TextPVLyricsPanel(state, Modifier, onInterfaceInteraction, active)
+            else -> AppleMusicLyricsPanel(
+                state,
+                Modifier,
+                isInterfaceHidden,
+                onInterfaceInteraction,
+                onInterfaceVisibilityChange,
+                active,
+                externalDocument = externalDocument,
+            )
+        }
     }
 }
 
@@ -257,9 +254,8 @@ private fun AppleMusicLyricsPanel(
     active: Boolean = true,
     externalDocument: com.muses.player.core.lyrics.model.LyricsDocument? = null,
 ) {
-    val context = LocalContext.current
-    val appContext = context.applicationContext
     val haptics = LocalHapticFeedback.current
+    val shareText = rememberShareTextHandler()
     val activeState = rememberUpdatedState(active)
     // Keep four future lines composed below the viewport. Their independent
     // cascade animations can then run before clipping reveals them.
@@ -279,7 +275,7 @@ private fun AppleMusicLyricsPanel(
     var shareInitialIndex by remember(mediaId) { mutableStateOf<Int?>(null) }
 
     var anchorPositionMs by remember(mediaId) { mutableLongStateOf(state.positionMs) }
-    var anchorRealtimeMs by remember(mediaId) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var anchorRealtimeMs by remember(mediaId) { mutableLongStateOf(platformRealtimeMs()) }
     val renderedPositionState = remember(mediaId) { mutableLongStateOf(state.positionMs) }
     var holdTrackAtStart by remember(mediaId) { mutableStateOf(false) }
     var initializedMediaId by remember { mutableStateOf(mediaId) }
@@ -299,7 +295,7 @@ private fun AppleMusicLyricsPanel(
         initializedMediaId = mediaId
         hasInitializedTrack = true
         anchorPositionMs = initialization.positionMs
-        anchorRealtimeMs = SystemClock.elapsedRealtime()
+        anchorRealtimeMs = platformRealtimeMs()
         renderedPositionState.longValue = initialization.positionMs
         holdTrackAtStart = initialization.holdAtTrackStart
         if (initialization.resetListToStart) listState.scrollToItem(0)
@@ -308,7 +304,7 @@ private fun AppleMusicLyricsPanel(
     LaunchedEffect(state.positionMs, state.isPlaying, mediaId) {
         if (holdTrackAtStart) return@LaunchedEffect
         anchorPositionMs = state.positionMs
-        anchorRealtimeMs = SystemClock.elapsedRealtime()
+        anchorRealtimeMs = platformRealtimeMs()
         renderedPositionState.longValue = state.positionMs
     }
 
@@ -387,7 +383,7 @@ private fun AppleMusicLyricsPanel(
                 lastFrameNanos = frameNanos
             }
             val position = if (state.isPlaying) {
-                anchorPositionMs + (SystemClock.elapsedRealtime() - anchorRealtimeMs)
+                anchorPositionMs + (platformRealtimeMs() - anchorRealtimeMs)
             } else {
                 anchorPositionMs
             }
@@ -400,11 +396,11 @@ private fun AppleMusicLyricsPanel(
 
     val lineIndexSeekSignal = remember(mediaId) { Channel<Unit>(Channel.CONFLATED) }
     var previousSeekPositionMs by remember(mediaId) { mutableLongStateOf(state.positionMs) }
-    var previousSeekRealtimeMs by remember(mediaId) { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    var previousSeekRealtimeMs by remember(mediaId) { mutableLongStateOf(platformRealtimeMs()) }
     LaunchedEffect(state.positionMs) {
         if (state.positionMs != previousSeekPositionMs) {
             val expected = previousSeekPositionMs + if (state.isPlaying) {
-                SystemClock.elapsedRealtime() - previousSeekRealtimeMs
+                platformRealtimeMs() - previousSeekRealtimeMs
             } else {
                 0L
             }
@@ -412,7 +408,7 @@ private fun AppleMusicLyricsPanel(
                 lineIndexSeekSignal.trySend(Unit)
             }
             previousSeekPositionMs = state.positionMs
-            previousSeekRealtimeMs = SystemClock.elapsedRealtime()
+            previousSeekRealtimeMs = platformRealtimeMs()
         }
     }
 
@@ -423,7 +419,7 @@ private fun AppleMusicLyricsPanel(
                 continue
             }
             val position = if (state.isPlaying) {
-                anchorPositionMs + (SystemClock.elapsedRealtime() - anchorRealtimeMs)
+                anchorPositionMs + (platformRealtimeMs() - anchorRealtimeMs)
             } else {
                 anchorPositionMs
             }
@@ -1128,16 +1124,8 @@ private fun AppleMusicLyricsPanel(
             lines = lines,
             initialIndex = initial,
             onDismiss = { shareInitialIndex = null },
-            // U17：安卓系统分享面板（桌面装配传剪贴板）
-            onShareText = { text ->
-                val shareIntent = android.content.Intent.createChooser(
-                    android.content.Intent(android.content.Intent.ACTION_SEND)
-                        .setType("text/plain")
-                        .putExtra(android.content.Intent.EXTRA_TEXT, text),
-                    "分享歌词",
-                )
-                context.startActivity(shareIntent)
-            },
+            // U21：分享句柄 expect/actual（安卓系统分享面板，桌面写剪贴板）
+            onShareText = shareText,
         )
     }
 }
@@ -1604,30 +1592,6 @@ private fun LyricInterludeCountdown(
     }
 }
 
-private fun shareLyric(context: Context, state: PlaybackUiState, line: LyricLine) {
-    val songUrl = state.mediaId
-        ?.toLongOrNull()
-        ?.takeIf { it > 0L }
-        ?.let { "https://music.163.com/song?id=$it" }
-        .orEmpty()
-    val text = buildString {
-        append(line.text)
-        if (state.title.isNotBlank()) {
-            append("\n——《").append(state.title).append("》")
-            if (state.artist.isNotBlank()) append(" · ").append(state.artist)
-        }
-        if (songUrl.isNotBlank()) append('\n').append(songUrl)
-    }
-    val intent = Intent.createChooser(
-        Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        },
-        "分享歌词",
-    )
-    context.startActivity(intent)
-}
-
 @Composable
 private fun GlyphLyricText(
     line: LyricLine,
@@ -1643,12 +1607,8 @@ private fun GlyphLyricText(
 ) {
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val flipped = line.agent?.alignment == com.muses.player.core.lyrics.model.LyricAgentAlignment.Flipped
-    val context = LocalContext.current
     val density = LocalDensity.current
     val lyricWeight = SettingsRuntime.lyricFontWeight.composeWeight
-    val fontTypeface = remember {
-        Typeface.DEFAULT
-    }
     val textMeasurer = rememberTextMeasurer(cacheSize = 64)
     BoxWithConstraints(modifier = modifier) {
         val widthPx = with(density) { maxWidth.roundToPx().coerceAtLeast(1) }
@@ -1711,45 +1671,52 @@ private fun GlyphLyricText(
                 longToneThresholdMs = longToneThresholdMs,
             )
         }
-        val glyphPaint = remember(style, density, fontTypeface) {
-            Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                textSize = with(density) { style.fontSize.toPx() }
-                typeface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    Typeface.create(fontTypeface, lyricWeight.weight, false)
+
+        // U21 跨平台 glyph 绘制：以整行同款 TextStyle 逐字预排版，drawText 按基线对齐绘制。
+        // 光晕/柔焦用 TextStyle.Shadow（compose 双端一致），替代 android 的
+        // nativeCanvas.drawText + BlurMaskFilter；透明字色只留模糊白轮廓（发光/失焦柔焦语义）。
+        val glyphLayoutCache = remember(style) { mutableMapOf<String, TextLayoutResult>() }
+        fun glyphLayoutFor(text: String, shadowBlurPx: Float?): TextLayoutResult =
+            glyphLayoutCache.getOrPut(if (shadowBlurPx == null) text else "$text\u0001$shadowBlurPx") {
+                val effectiveStyle = if (shadowBlurPx == null) {
+                    style
                 } else {
-                    Typeface.create(fontTypeface, if (lyricWeight.weight >= 600) Typeface.BOLD else Typeface.NORMAL)
+                    style.copy(shadow = Shadow(color = Color.White, offset = Offset.Zero, blurRadius = shadowBlurPx))
                 }
+                textMeasurer.measure(
+                    text = AnnotatedString(text),
+                    style = effectiveStyle,
+                    softWrap = false,
+                )
             }
-        }
-        val blurMask = remember(softBlurDp, density) {
-            val radiusPx = with(density) { softBlurDp.dp.toPx() }
-            radiusPx.takeIf { it > .05f }?.let { BlurMaskFilter(it, BlurMaskFilter.Blur.NORMAL) }
-        }
 
         val animatesTiming = supportsTimedLyrics &&
             timingEffectsStrength > 0.001f &&
             line.text.isNotEmpty()
         if (!animatesTiming) {
+            // 柔焦（距离/焦点模糊）整行走 Shadow 白轮廓：一次 drawText 代替逐字 maskFilter，
+            // 视觉等价于按行模糊白字轮廓，字形位置仍来自 Compose 排版
+            val softBlurPx = with(density) { softBlurDp.dp.toPx() }
+            val blurredLayout = if (softBlurPx > .05f) {
+                remember(layout, softBlurPx) {
+                    textMeasurer.measure(
+                        text = AnnotatedString(line.text),
+                        style = style.copy(
+                            shadow = Shadow(color = Color.White, offset = Offset.Zero, blurRadius = softBlurPx),
+                        ),
+                        constraints = Constraints(minWidth = widthPx, maxWidth = widthPx),
+                        softWrap = true,
+                    )
+                }
+            } else {
+                null
+            }
             Canvas(Modifier.fillMaxWidth().height(height)) {
-                val staticAlpha = 1f
-                if (blurMask == null) {
-                    drawText(layout, color = Color.White.copy(alpha = staticAlpha))
+                val blurred = blurredLayout
+                if (blurred == null) {
+                    drawText(layout, color = Color.White)
                 } else {
-                    // Blur glyph masks directly. Unlike RenderEffect this does
-                    // not allocate a screen-sized offscreen texture per lyric
-                    // row, and the positions still come from Compose's layout.
-                    glyphPaint.alpha = (staticAlpha * 255f).roundToInt()
-                    glyphPaint.maskFilter = blurMask
-                    drawableGlyphs.forEach { glyph ->
-                        drawContext.canvas.nativeCanvas.drawText(
-                            glyph.text,
-                            glyph.bounds.left,
-                            glyph.baseline,
-                            glyphPaint,
-                        )
-                    }
-                    glyphPaint.maskFilter = null
+                    drawText(blurred, color = Color.Transparent)
                 }
             }
             return@BoxWithConstraints
@@ -1825,17 +1792,22 @@ private fun GlyphLyricText(
                         pivot = bounds.center,
                     )
                 }) {
-                    fun drawGlyph(alpha: Float) {
+                    fun drawGlyph(alpha: Float, shadowBlurPx: Float? = null) {
                         // The measured position and baseline come from the
                         // complete Compose layout, but only this glyph is
                         // rasterized. Both layers share this transformed
-                        // coordinate space, matching  iOS's runContext.
-                        glyphPaint.alpha = (alpha.coerceIn(0f, 1f) * 255f).roundToInt()
-                        drawContext.canvas.nativeCanvas.drawText(
-                            glyph.text,
-                            glyph.bounds.left,
-                            glyph.baseline,
-                            glyphPaint,
+                        // coordinate space, matching iOS's runContext.
+                        // U21：单字 drawText（基线对齐）替代 nativeCanvas.drawText；
+                        // shadowBlurPx 非空时走 Shadow 白轮廓（透明字色只留光晕）。
+                        val result = glyphLayoutFor(glyph.text, shadowBlurPx)
+                        drawText(
+                            textLayoutResult = result,
+                            color = if (shadowBlurPx == null) {
+                                Color.White.copy(alpha = alpha.coerceIn(0f, 1f))
+                            } else {
+                                Color.Transparent
+                            },
+                            topLeft = Offset(glyph.bounds.left, glyph.baseline - result.firstBaseline),
                         )
                     }
 
@@ -1867,15 +1839,8 @@ private fun GlyphLyricText(
                             right = if (isRtl) bounds.right + glowRadius else revealFront + glowRadius,
                             bottom = bounds.bottom + glowRadius,
                         ) {
-                            glyphPaint.alpha = (glow.coerceIn(0f, 1f) * .648f * 255f).roundToInt()
-                            glyphPaint.maskFilter = BlurMaskFilter(glowRadius, BlurMaskFilter.Blur.NORMAL)
-                            drawContext.canvas.nativeCanvas.drawText(
-                                glyph.text,
-                                glyph.bounds.left,
-                                glyph.baseline,
-                                glyphPaint,
-                            )
-                            glyphPaint.maskFilter = null
+                            // U21：Shadow 白轮廓光晕（透明字色），等价原 BlurMaskFilter 模糊白字
+                            drawGlyph(glow.coerceIn(0f, 1f) * .648f, glowRadius)
                         }
                     }
 

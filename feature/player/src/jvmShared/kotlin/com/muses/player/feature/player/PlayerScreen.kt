@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -51,7 +52,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -121,11 +121,7 @@ fun PlayerScreen(
     val stickyCover by viewModel.stickyCover.collectAsStateWithLifecycle()
     val playbackError by viewModel.playbackError.collectAsStateWithLifecycle()
 
-    val configuration = LocalConfiguration.current
-    val isTabletLayout = remember(configuration) {
-        configuration.screenWidthDp >= 768 && configuration.screenHeightDp < configuration.screenWidthDp
-    }
-    val isNarrowHeight = remember(configuration) { configuration.screenHeightDp <= 520 }
+    // U21：屏幕尺寸改用视口约束（见下方 BoxWithConstraints），原 LocalConfiguration 仅安卓可用
 
     // U12：标题/艺术家改由曲库实时流（metaTitle/metaArtist 刮削优先）；原 Media3 动态 ID3
     // 标签与扫描标签同源，差异仅在未回写窗口期
@@ -162,19 +158,22 @@ fun PlayerScreen(
         isDraggingVertically = false
     }
 
-    // 下滑阈值：96~160，取 0.18*height 的 clamp（对齐 getDismissThreshold）
-    val dismissThresholdPx = with(density) {
-        val h = configuration.screenHeightDp.dp.toPx()
-        (h * 0.18f).coerceIn(96.dp.toPx(), 160.dp.toPx())
-    }
-
     // 外层：m-popup 背景透明（对齐 .player-page__popup background: transparent !important）——
     // 无 scrim 黑化，drag-layer 下滑时直接漏出底下列表（原版 1:1）
-    Box(
+    BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
     ) {
-        val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-        val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+        // U21：屏幕尺寸取自视口约束（原 LocalConfiguration 仅安卓可用）
+        val screenWidth = maxWidth
+        val screenHeight = maxHeight
+        val isTabletLayout = screenWidth >= 768.dp && screenHeight < screenWidth
+        val isNarrowHeight = screenHeight <= 520.dp
+
+        // 下滑阈值：96~160，取 0.18*height 的 clamp（对齐 getDismissThreshold）
+        val dismissThresholdPx = with(density) {
+            val h = screenHeight.toPx()
+            (h * 0.18f).coerceIn(96.dp.toPx(), 160.dp.toPx())
+        }
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -627,6 +626,8 @@ private fun TabletImmersiveLayout(
             onToggleShuffle = onToggleShuffle,
             onOpenQueue = onOpenQueue,
             onOpenEditMeta = onOpenEditMeta,
+            screenWidth = maxWidth,
+            screenHeight = maxHeight,
         )
     }
 }
@@ -733,10 +734,18 @@ private fun InfoPanel(
                 duration = duration,
                 onSeekStart = onSeekStart,
                 onSeekEnd = onSeekEnd,
+                screenHeight = maxHeight,
                 onSeekDragActive = onSeekDragActive,
             )
             Spacer(Modifier.height(innerGap))
-            ControlsRow(isPlaying = isPlaying, onPrevious = onPrevious, onPlayPause = onPlayPause, onNext = onNext)
+            ControlsRow(
+                isPlaying = isPlaying,
+                onPrevious = onPrevious,
+                onPlayPause = onPlayPause,
+                onNext = onNext,
+                screenWidth = maxWidth,
+                screenHeight = maxHeight,
+            )
             Spacer(Modifier.height(innerGap))
             ModeBarRow(
                 repeatMode = repeatMode,
@@ -745,6 +754,7 @@ private fun InfoPanel(
                 onToggleShuffle = onToggleShuffle,
                 onOpenQueue = onOpenQueue,
                 onOpenEditMeta = onOpenEditMeta,
+                screenHeight = maxHeight,
             )
         } else {
             Spacer(Modifier.height(12.dp))
@@ -781,11 +791,12 @@ private fun ProgressSection(
     duration: Long,
     onSeekStart: () -> Unit,
     onSeekEnd: (Long) -> Unit,
+    screenHeight: Dp,
     // 进度条手势活跃状态：按下即 true（tap/拖动均算），抬手/取消即 false。
     // 手机布局据此禁用 HorizontalPager 横滑，杜绝 seek 拖动被当成切页。
     onSeekDragActive: (Boolean) -> Unit = {},
 ) {
-    val barHeight = if (LocalConfiguration.current.screenHeightDp <= 520) 18.dp else 20.dp
+    val barHeight = if (screenHeight <= 520.dp) 18.dp else 20.dp
     PlayerProgress(
         positionMs = position,
         durationMs = duration,
@@ -802,17 +813,16 @@ private fun ControlsRow(
     onPrevious: () -> Unit,
     onPlayPause: () -> Unit,
     onNext: () -> Unit,
+    screenWidth: Dp,
+    screenHeight: Dp,
     compact: Boolean = false,
 ) {
     // controls：三键 lg（48/28），gap clamp(24,10vw,44)；矮屏断点收紧（≤720 clamp(12,4vw,20)、≤520 clamp(10,3.5vw,16)）
-    val configuration = LocalConfiguration.current
     val gap = if (compact) 12.dp else {
-        val vw = configuration.screenWidthDp.dp
-        val vw10 = vw * 0.10f
         when {
-            configuration.screenHeightDp <= 520 -> (vw * 0.035f).coerceIn(10.dp, 16.dp)
-            configuration.screenHeightDp <= 720 -> (vw * 0.04f).coerceIn(12.dp, 20.dp)
-            else -> vw10.coerceIn(24.dp, 44.dp)
+            screenHeight <= 520.dp -> (screenWidth * 0.035f).coerceIn(10.dp, 16.dp)
+            screenHeight <= 720.dp -> (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+            else -> (screenWidth * 0.10f).coerceIn(24.dp, 44.dp)
         }
     }
     PlayerControls(
@@ -833,11 +843,12 @@ private fun ModeBarRow(
     onToggleShuffle: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenEditMeta: () -> Unit,
+    screenHeight: Dp,
 ) {
     // mode-bar：max-width 320（≤720 收 280、≤520 收 260），space-between，无 is-active（仅图标对 + aria-label）
     val modeMaxWidth = when {
-        LocalConfiguration.current.screenHeightDp <= 520 -> 260.dp
-        LocalConfiguration.current.screenHeightDp <= 720 -> 280.dp
+        screenHeight <= 520.dp -> 260.dp
+        screenHeight <= 720.dp -> 280.dp
         else -> 320.dp
     }
     PlayerModeBar(
@@ -869,6 +880,8 @@ private fun TabletBottomBar(
     onToggleShuffle: () -> Unit,
     onOpenQueue: () -> Unit,
     onOpenEditMeta: () -> Unit,
+    screenWidth: Dp,
+    screenHeight: Dp,
 ) {
     Column(
         Modifier
@@ -887,6 +900,7 @@ private fun TabletBottomBar(
             duration = duration,
             onSeekStart = onSeekStart,
             onSeekEnd = onSeekEnd,
+            screenHeight = screenHeight,
         )
         Spacer(Modifier.height(2.dp))
         // 三段式：left mode + center controls + right mode，space-between，中组居中于屏幕中心
@@ -915,7 +929,7 @@ private fun TabletBottomBar(
                 onPlayPause = onPlayPause,
                 onNext = onNext,
                 compact = true,
-                gap = (LocalConfiguration.current.screenWidthDp.dp * 0.05f).coerceIn(20.dp, 44.dp),
+                gap = (screenWidth * 0.05f).coerceIn(20.dp, 44.dp),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 SaltIconButton(onClick = onOpenQueue, imageVector = TablerIcons.QueueMusic, contentDescription = "播放队列", tint = Color.White.copy(alpha = 0.8f))
