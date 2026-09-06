@@ -39,7 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.muses.player.desktop.playback.DesktopLyricsSearchState
 import com.muses.player.desktop.playback.DesktopPlayerHook
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import com.muses.player.feature.player.PlayerViewModel
+import com.muses.player.feature.player.QueueRow
 import com.muses.player.feature.player.lyric.SimpleLyricsPanel
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -63,6 +66,8 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
     val lyricPosition by vm.lyricPosition.collectAsState()
     val translationEnabled by vm.translationEnabled.collectAsState()
     val hasTranslation by vm.hasTranslation.collectAsState()
+    val queueRows by vm.queueRows.collectAsState()
+    val currentSongId by vm.currentSongId.collectAsState()
     val status by hook.status.collectAsState()
     val lyricsSearch by hook.lyricsSearch.collectAsState()
     val volume by hook.volume.collectAsState()
@@ -167,29 +172,137 @@ fun PlayerScreen(playerHook: DesktopPlayerHook?) {
                 .fillMaxHeight()
                 .background(Color(0xFF313244)),
         )
-        // 右面板：歌词（共享 VM 解析链：曲库 lyrics 字段 → AMLL 行，100ms 卡拉OK进度）
-        Box(
+        // 右面板：歌词 / 队列（U16：队列管理接入共享 PlayerViewModel.queueRows + 端口原语）
+        var rightTab by remember { mutableStateOf("lyrics") }
+        Column(
             modifier = Modifier.weight(0.58f).fillMaxHeight(),
-            contentAlignment = Alignment.Center,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (parsedLines.isEmpty()) {
-                LyricsEmptyState(
-                    hasSong = currentSong != null,
-                    searchState = lyricsSearch,
-                    onSearch = hook::searchOnlineLyrics,
+            // tab 行
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                TabText("歌词", rightTab == "lyrics") { rightTab = "lyrics" }
+                TabText("队列", rightTab == "queue") { rightTab = "queue" }
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                if (rightTab == "queue") {
+                    QueuePanel(
+                        rows = queueRows,
+                        currentSongId = currentSongId,
+                        onPlayAt = vm::playAtIndex,
+                        onRemove = vm::removeQueueItemAt,
+                        onClear = vm::clearQueue,
+                    )
+                } else if (parsedLines.isEmpty()) {
+                    LyricsEmptyState(
+                        hasSong = currentSong != null,
+                        searchState = lyricsSearch,
+                        onSearch = hook::searchOnlineLyrics,
+                    )
+                } else {
+                    SimpleLyricsPanel(
+                        lines = parsedLines,
+                        positionMs = lyricPosition,
+                        isPlaying = isPlaying,
+                        onSeek = { vm.seekTo(it) },
+                        modifier = Modifier.fillMaxSize(),
+                        // U13：翻译开关接共享 VM 真实值（SimpleLyricsPanel 兼容参数）
+                        translationEnabled = translationEnabled,
+                        hasTranslation = hasTranslation,
+                        onToggleTranslation = { vm.toggleTranslation() },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 面板 tab 文本（选中高亮） */
+@Composable
+private fun TabText(text: String, selected: Boolean, onClick: () -> Unit) {
+    Text(
+        text = text,
+        color = if (selected) Color(0xFF89B4FA) else Color(0xFF7F849C),
+        fontSize = 14.sp,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+        ),
+    )
+}
+
+/** 播放队列面板（U16）：当前曲高亮、点击跳播、行尾移除、顶部清空 */
+@Composable
+private fun QueuePanel(
+    rows: List<QueueRow>,
+    currentSongId: String?,
+    onPlayAt: (Int) -> Unit,
+    onRemove: (Int) -> Unit,
+    onClear: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("播放队列（${rows.size}）", color = Color(0xFFCDD6F4), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            if (rows.isNotEmpty()) {
+                Text(
+                    text = "清空",
+                    color = Color(0xFFF38BA8),
+                    fontSize = 13.sp,
+                    modifier = Modifier.clickable(onClick = onClear),
                 )
-            } else {
-                SimpleLyricsPanel(
-                    lines = parsedLines,
-                    positionMs = lyricPosition,
-                    isPlaying = isPlaying,
-                    onSeek = { vm.seekTo(it) },
-                    modifier = Modifier.fillMaxSize(),
-                    // U13：翻译开关接共享 VM 真实值（SimpleLyricsPanel 兼容参数）
-                    translationEnabled = translationEnabled,
-                    hasTranslation = hasTranslation,
-                    onToggleTranslation = { vm.toggleTranslation() },
-                )
+            }
+        }
+        if (rows.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("队列为空", color = Color(0xFF7F849C), fontSize = 14.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                itemsIndexed(rows, key = { _, row -> row.songId }) { index, row ->
+                    val isCurrent = row.songId == currentSongId
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isCurrent) Color(0xFF313244) else Color.Transparent)
+                            .clickable { onPlayAt(index) }
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = row.title,
+                                color = if (isCurrent) Color(0xFF89B4FA) else Color(0xFFCDD6F4),
+                                fontSize = 15.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = row.artist ?: "未知歌手",
+                                color = Color(0xFF7F849C),
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        Text(
+                            text = "移除",
+                            color = Color(0xFF7F849C),
+                            fontSize = 12.sp,
+                            modifier = Modifier
+                                .clickable { onRemove(index) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
         }
     }

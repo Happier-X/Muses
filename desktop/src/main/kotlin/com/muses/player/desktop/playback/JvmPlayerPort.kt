@@ -215,6 +215,17 @@ class JvmPlayerPort(
         playSongId(item.songId, 0L)
     }
 
+    /** U16：按队列位置移除条目（复用状态机 removeSongs；队列内 songId 唯一，按 id 移除等价按 index） */
+    fun removeQueueItemAt(index: Int) {
+        val songId = queue.activeOrder().getOrNull(index)?.songId ?: return
+        queue.removeSongs(setOf(songId))
+    }
+
+    /** U16：清空播放队列（当前曲播放不受影响，队列态清空） */
+    fun clearQueueItems() {
+        queue.removeSongs(queue.activeOrder().map { it.songId }.toSet())
+    }
+
     override fun setRepeatMode(mode: Int) {
         setRepeatMode(repeatModeFromInt(mode))
     }

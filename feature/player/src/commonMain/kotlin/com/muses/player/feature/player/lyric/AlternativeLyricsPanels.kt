@@ -1,6 +1,5 @@
 package com.muses.player.feature.player.lyric
 
-import android.os.SystemClock
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -46,7 +45,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -68,7 +66,6 @@ private fun rememberAlternativeLyrics(
     state: PlaybackUiState,
     active: Boolean,
 ): AlternativeLyricsState {
-    val context = LocalContext.current.applicationContext
     val mediaId = state.mediaId
     val automaticLyricSelectionEnabled = SettingsRuntime.automaticLyricSelectionEnabled
     var document by remember(mediaId, automaticLyricSelectionEnabled) { mutableStateOf<LyricsDocument?>(null) }
@@ -80,7 +77,7 @@ private fun rememberAlternativeLyrics(
         if (!active || mediaId.isNullOrBlank() || loadedRequestKey == requestKey) return@LaunchedEffect
         loading = true
         error = null
-        runCatching { ProviderLyricsLoader.load(context, state) }
+        runCatching { ProviderLyricsLoader.load(state) }
             .onSuccess {
                 document = it
                 loadedRequestKey = requestKey
@@ -110,9 +107,9 @@ private fun rememberAlternativeLyrics(
             if (next != index) index = next
             return@LaunchedEffect
         }
-        val anchorRealtimeMs = SystemClock.elapsedRealtime()
+        val anchorRealtimeMs = com.muses.player.core.data.store.platformMonotonicMs()
         while (isActive) {
-            val position = (anchorPosition + SystemClock.elapsedRealtime() - anchorRealtimeMs).coerceAtMost(
+            val position = (anchorPosition + com.muses.player.core.data.store.platformMonotonicMs() - anchorRealtimeMs).coerceAtMost(
                 state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
             )
             val next = activeDocument.highlightedIndex(position + advanceMs)
@@ -139,7 +136,6 @@ private fun rememberTextPVLyrics(
     state: PlaybackUiState,
     active: Boolean,
 ): TextPVLyricsState {
-    val context = LocalContext.current.applicationContext
     val mediaId = state.mediaId
     val automaticLyricSelectionEnabled = SettingsRuntime.automaticLyricSelectionEnabled
     var document by remember(mediaId, automaticLyricSelectionEnabled) { mutableStateOf<LyricsDocument?>(null) }
@@ -152,7 +148,7 @@ private fun rememberTextPVLyrics(
         if (!active || mediaId.isNullOrBlank() || loadedRequestKey == requestKey) return@LaunchedEffect
         loading = true
         error = null
-        runCatching { ProviderLyricsLoader.load(context, state) }
+        runCatching { ProviderLyricsLoader.load(state) }
             .onSuccess {
                 document = it
                 loadedRequestKey = requestKey
@@ -189,9 +185,9 @@ private fun rememberTextPVLyrics(
             return@LaunchedEffect
         }
 
-        val anchorRealtimeMs = SystemClock.elapsedRealtime()
+        val anchorRealtimeMs = com.muses.player.core.data.store.platformMonotonicMs()
         while (isActive) {
-            val position = (anchorPosition + SystemClock.elapsedRealtime() - anchorRealtimeMs).coerceAtMost(
+            val position = (anchorPosition + com.muses.player.core.data.store.platformMonotonicMs() - anchorRealtimeMs).coerceAtMost(
                 state.durationMs.takeIf { it > 0L } ?: Long.MAX_VALUE,
             )
             val nextIndex = activeDocument.highlightedIndex(position + advanceMs)

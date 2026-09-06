@@ -78,6 +78,10 @@ class PlayerConnection constructor(
     private val _artworkUri = MutableStateFlow<String?>(null)
     override val artworkUri: StateFlow<String?> = _artworkUri.asStateFlow()
 
+    // U16 端口派生：当前曲实时展示元数据（SongsPage 当前播放行动态标签消费）
+    private val _currentMeta = MutableStateFlow<com.muses.player.core.playback.PlaybackMeta?>(null)
+    override val currentMeta: StateFlow<com.muses.player.core.playback.PlaybackMeta?> = _currentMeta.asStateFlow()
+
     private val _position = MutableStateFlow(0L)
     val position: StateFlow<Long> = _position.asStateFlow()
 
@@ -362,6 +366,12 @@ class PlayerConnection constructor(
         // U12 端口派生流同步（与上面 Media3 流一一对应）
         _currentSongId.value = player.currentMediaItem?.mediaId
         _artworkUri.value = meta.artworkUri?.toString()
+        _currentMeta.value = com.muses.player.core.playback.PlaybackMeta(
+            title = meta.title?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            artist = meta.artist?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            album = meta.albumTitle?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+            coverUri = meta.artworkUri?.toString(),
+        )
         _queueSongIds.value = (0 until player.mediaItemCount).map { player.getMediaItemAt(it).mediaId }
         _position.value = player.currentPosition
         _duration.value = if (player.duration > 0) player.duration else 0L

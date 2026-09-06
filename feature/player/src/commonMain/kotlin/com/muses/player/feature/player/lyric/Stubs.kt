@@ -1,6 +1,5 @@
 package com.muses.player.feature.player.lyric
 
-import android.content.Context
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -135,10 +134,10 @@ object R
 const val NowPlayingControlsHeight: Int = 84
 
 object ProviderLyricsLoader {
-    suspend fun load(context: Context, state: PlaybackUiState): LyricsDocument? = null
+    suspend fun load(state: PlaybackUiState): LyricsDocument? = null
 }
 
 fun normalizeLyricMatchText(text: String?): String = text?.trim()?.lowercase().orEmpty()
-suspend fun shareLyricImage(context: Context, state: PlaybackUiState, lines: List<LyricLine>) {}
+suspend fun shareLyricImage(state: PlaybackUiState, lines: List<LyricLine>) {}
 fun Modifier.meloXLiquidButton(shape: RoundedCornerShape, enabled: Boolean, surfaceColor: Color): Modifier = this
 @Composable fun Artwork(url: String?, modifier: Modifier = Modifier) { AsyncImage(model = url, contentDescription = null, modifier = modifier, contentScale = ContentScale.Crop) }

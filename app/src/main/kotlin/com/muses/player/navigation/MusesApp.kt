@@ -104,25 +104,25 @@ class MainViewModel constructor(
             val title = when {
                 song == null -> metaTitle ?: "未知歌曲"
                 song.metaTitle != null -> song.title
-                song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION -> metaTitle ?: song.title
+                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaTitle ?: song.title
                 else -> song.title
             }
             val artist = when {
                 song == null -> metaArtist ?: "未知艺术家"
                 song.metaArtist != null -> song.artist ?: "未知艺术家"
-                song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION -> metaArtist ?: song.artist ?: "未知艺术家"
+                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaArtist ?: song.artist ?: "未知艺术家"
                 else -> song.artist ?: "未知艺术家"
             }
             val album = when {
                 song == null -> metaAlbum ?: "未知专辑"
                 song.metaAlbum != null -> song.albumTitle ?: "未知专辑"
-                song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION -> metaAlbum ?: song.albumTitle ?: "未知专辑"
+                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaAlbum ?: song.albumTitle ?: "未知专辑"
                 else -> song.albumTitle ?: "未知专辑"
             }
             val cover = when {
                 song == null -> metaCover
                 song.metaCover != null -> song.coverUri
-                song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION -> metaCover ?: song.coverUri
+                song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION -> metaCover ?: song.coverUri
                 else -> song.coverUri
             }
             NowPlayingUiState(
@@ -291,12 +291,12 @@ private fun AppNavHost(navController: NavHostController) {
         modifier = Modifier.fillMaxSize(),
     ) {
         composable(NavDestination.Songs.route) {
-            // U12：SongsPage（安卓 Page 层）深绑 Media3 metadata，仍取具体 PlayerConnection
-            val playerConnection = org.koin.compose.koinInject<com.muses.player.core.media.playback.PlayerConnection>()
+            // U16：SongsPage 已上收 commonMain，经端口消费（不再依赖 Media3 具体类）
+            val playback = org.koin.compose.koinInject<com.muses.player.core.playback.PlaybackPort>()
             // M3：刮削队列入队（ScrapeQueueStore 为 @Singleton，经 koinViewModel 载体注入）
             val scrapeVm: com.muses.player.feature.scrape.ScrapeQueueAccessViewModel = koinViewModel()
             SongsPage(
-                playerConnection = playerConnection,
+                playback = playback,
                 onEnqueueScrape = { ids -> scrapeVm.enqueue(ids) },
             )
         }

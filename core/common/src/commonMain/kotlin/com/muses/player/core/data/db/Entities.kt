@@ -6,6 +6,15 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * 标签格式版本（U16 常量归位 core:common）：songs.tagsVersion < TAGS_VERSION 表示该行
+ * 标签为文件名建库占位、待播放懒扫描回写；core:media 的 LocalLibraryScanner.TAGS_VERSION
+ * 转发引用本常量（单一事实源）。
+ */
+object SongTags {
+    const val TAGS_VERSION = 1
+}
+
 /** 歌曲（与 core:model Song 一一对应） */
 @Entity(
     tableName = "songs",

@@ -11,3 +11,9 @@ expect fun platformNowIso(): String
  * commonMain 无 System.currentTimeMillis；双端 actual 均为 JDK 真实时间。
  */
 expect fun platformNowMs(): Long
+
+/**
+ * U17 单调时钟（歌词渲染锚点计时用，墙钟回拨不影响节奏）：
+ * android = SystemClock.elapsedRealtime()；jvm = System.nanoTime()/1e6。
+ */
+expect fun platformMonotonicMs(): Long

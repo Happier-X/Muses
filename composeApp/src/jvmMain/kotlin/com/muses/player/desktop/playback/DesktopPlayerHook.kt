@@ -98,6 +98,10 @@ class DesktopPlayerHook(
     private val _artworkUri = MutableStateFlow<String?>(null)
     override val artworkUri: StateFlow<String?> = _artworkUri.asStateFlow()
 
+    /** 当前曲实时展示元数据（桌面暂空——展示走曲库实时流；TODO：随 artworkUri 一并桥接） */
+    private val _currentMeta = MutableStateFlow<com.muses.player.core.playback.PlaybackMeta?>(null)
+    override val currentMeta: StateFlow<com.muses.player.core.playback.PlaybackMeta?> = _currentMeta.asStateFlow()
+
     /** 播放失败文案（bridge 自 JvmPlayerPort.playbackError；桌面错误仅提示不阻断） */
     private val _playbackError = MutableStateFlow<String?>(null)
     override val playbackError: StateFlow<String?> = _playbackError.asStateFlow()
@@ -187,11 +191,21 @@ class DesktopPlayerHook(
     }
 
     override fun removeQueueItemAt(index: Int) {
-        // TODO：桌面无队列管理 UI，JvmPlayerPort 无移除原语；暂不生效
+        scope.launch {
+            runCatching {
+                ensurePlayer().removeQueueItemAt(index)
+                _queueSongIds.value = ensurePlayer().activeOrderIds()
+            }
+        }
     }
 
     override fun clearQueueItems() {
-        // TODO：同上（停止播放即可近似，待队列管理接入）
+        scope.launch {
+            runCatching {
+                ensurePlayer().clearQueueItems()
+                _queueSongIds.value = emptyList()
+            }
+        }
     }
 
     override fun skipToNext() = next()

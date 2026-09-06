@@ -37,7 +37,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import org.koin.compose.viewmodel.koinViewModel
 import com.muses.player.core.ui.components.SaltEmpty
 import com.muses.player.core.ui.components.SaltNavbar
@@ -307,5 +306,8 @@ private fun gridTopPadding(): Dp {
  * 页面级用屏幕宽度而非容器宽度——与 Web media query 的 viewport 口径一致。
  */
 @Composable
-private fun isTabletWidth(): Boolean =
-    LocalConfiguration.current.screenWidthDp >= 768
+private fun isTabletWidth(): Boolean {
+    // U16：LocalConfiguration 为安卓专属，改 LocalWindowInfo 容器宽度（双端一致）
+    val containerWidth = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.width
+    return containerWidth / androidx.compose.ui.platform.LocalDensity.current.density >= 768f
+}

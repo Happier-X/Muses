@@ -33,11 +33,12 @@ kotlin {
             // P2a Koin（统一 4.2.0；KMP sourceSets 不支持 platform(BOM)，toml 已显式挂版本）
             implementation(libs.koin.core)
             implementation(libs.koin.compose.viewmodel)
+            // U17：歌词外围组件（Stubs.Artwork 封面 AsyncImage）进 commonMain
+            implementation(libs.coil.compose)
         }
 
         androidMain.dependencies {
-            // 播放屏/歌词面板（coil 封面、accompanist lyrics-core 映射、collectAsStateWithLifecycle）
-            implementation(libs.coil.compose)
+            // 播放屏/歌词面板本体（accompanist lyrics-core 映射、collectAsStateWithLifecycle）
             implementation(libs.accompanist.lyrics.core)
             implementation(libs.androidx.lifecycle.runtime.compose)
         }

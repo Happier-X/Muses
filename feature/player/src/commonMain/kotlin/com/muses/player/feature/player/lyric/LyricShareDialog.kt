@@ -1,6 +1,5 @@
 package com.muses.player.feature.player.lyric
 
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,8 +50,9 @@ internal fun LyricShareDialog(
     lines: List<LyricLine>,
     initialIndex: Int,
     onDismiss: () -> Unit,
+    /** U17：分享动作回调（安卓系统分享面板 / 桌面剪贴板） */
+    onShareText: (String) -> Unit,
 ) {
-    val context = LocalContext.current
     val foreground = MaterialTheme.colorScheme.onBackground
     val surfaceForeground = MaterialTheme.colorScheme.onSurface
     val scope = rememberCoroutineScope()
@@ -63,7 +62,7 @@ internal fun LyricShareDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Column(
             Modifier.fillMaxSize()
@@ -123,12 +122,12 @@ internal fun LyricShareDialog(
                         append(chosen.joinToString("\n") { it.text })
                         append("\n——《${state.title}》 · ${state.artist}")
                     }
-                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "分享歌词"))
+                    onShareText(text)
                 }
                 ShareButton(if (generating) "生成中…" else "生成图片", Modifier.weight(1f), selected.isNotEmpty() && !generating) {
                     generating = true; error = null
                     scope.launch {
-                        runCatching { shareLyricImage(context, state, selected.sorted().mapNotNull(lines::getOrNull)) }
+                        runCatching { shareLyricImage(state, selected.sorted().mapNotNull(lines::getOrNull)) }
                             .onFailure { error = it.message ?: "歌词图片生成失败" }
                         generating = false
                     }

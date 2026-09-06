@@ -53,7 +53,8 @@ import androidx.compose.ui.unit.sp
 import org.koin.compose.viewmodel.koinViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.muses.player.core.media.playback.PlayerConnection
+import com.muses.player.core.playback.PlaybackMeta
+import com.muses.player.core.playback.PlaybackPort
 import com.muses.player.core.model.Song
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
@@ -95,7 +96,8 @@ import dev.chrisbanes.haze.rememberHazeState
  */
 @Composable
 fun SongsPage(
-    playerConnection: PlayerConnection?,
+    /** 播放端口（U16：commonMain 感知端口而非安卓 PlayerConnection；null = 未接线） */
+    playback: PlaybackPort?,
     /** M3：加入待刮削队列（经回调注入，feature:library 不直接依赖 core:scrape） */
     onEnqueueScrape: (List<String>) -> Unit = {},
     modifier: Modifier = Modifier,
@@ -117,10 +119,10 @@ fun SongsPage(
     val scope = rememberCoroutineScope()
 
     // 当前播放歌曲 id（playerState.currentSong.id；null = 未播放）
-    val currentSongId: String? = playerConnection?.currentMediaItem?.let { flow ->
-        flow.collectAsState().value?.mediaId
+    val currentSongId: String? = playback?.currentSongId?.let { flow ->
+        flow.collectAsState().value
     }
-    val currentMediaMetadata by playerConnection?.mediaMetadata?.collectAsState() ?: remember { mutableStateOf<androidx.media3.common.MediaMetadata?>(null) }
+    val currentMeta by playback?.currentMeta?.collectAsState() ?: remember { mutableStateOf<PlaybackMeta?>(null) }
 
     // 列表滚动中防抖 300ms（对照 onListScroll/isListScrolling：滚动时隐藏气泡不挡更多按钮）
     var scrollSettled by remember { mutableStateOf(true) }
@@ -171,12 +173,11 @@ fun SongsPage(
 
     val outerHazeState = LocalHazeBlurState.current as? dev.chrisbanes.haze.HazeState
     val navbarHazeState = rememberHazeState()
-    val context = androidx.compose.ui.platform.LocalContext.current
     fun doEnqueue(ids: List<String>) {
         if (ids.isEmpty()) return
         onEnqueueScrape(ids)
         val msg = if (ids.size == 1) "已加入待刮削队列" else "已加入 ${ids.size} 首到待刮削队列"
-        android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
+        com.muses.player.core.uishared.platform.PlatformToast.show(msg)
     }
     CompositionLocalProvider(LocalHazeBlurState provides navbarHazeState) {
         Box(modifier = modifier.fillMaxSize()) {
@@ -213,15 +214,15 @@ fun SongsPage(
                         title = run {
                             val useMetaForTitle = song.id == currentSongId
                                 && song.metaSources?.title == null
-                                && song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION
-                            if (useMetaForTitle) currentMediaMetadata?.title?.toString()?.trim()?.takeIf { it.isNotEmpty() } ?: song.title else song.title
+                                && song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION
+                            if (useMetaForTitle) currentMeta?.title?.trim()?.takeIf { it.isNotEmpty() } ?: song.title else song.title
                         },
                         subtitle = run {
                             val isCurrent = song.id == currentSongId
-                            val useMetaArtist = isCurrent && song.metaSources?.artist == null && song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION
-                            val useMetaAlbum = isCurrent && song.metaSources?.album == null && song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION
-                            val metaArtist = if (useMetaArtist) currentMediaMetadata?.artist?.toString()?.trim()?.takeIf { it.isNotEmpty() } else null
-                            val metaAlbum = if (useMetaAlbum) currentMediaMetadata?.albumTitle?.toString()?.trim()?.takeIf { it.isNotEmpty() } else null
+                            val useMetaArtist = isCurrent && song.metaSources?.artist == null && song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION
+                            val useMetaAlbum = isCurrent && song.metaSources?.album == null && song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION
+                            val metaArtist = if (useMetaArtist) currentMeta?.artist?.trim()?.takeIf { it.isNotEmpty() } else null
+                            val metaAlbum = if (useMetaAlbum) currentMeta?.album?.trim()?.takeIf { it.isNotEmpty() } else null
                             "${metaArtist ?: song.artist ?: "未知艺术家"} - ${metaAlbum ?: song.album ?: "未知专辑"}"
                         },
                         // Web .songs-page :deep(.m-list-item)：72dp 行高/16-12px 字号/紧凑 after
@@ -232,7 +233,7 @@ fun SongsPage(
                                     if (song.id in selectedIds) selectedIds - song.id
                                     else selectedIds + song.id
                             } else {
-                                playerConnection?.play(song.id, songs)
+                                playback?.play(song.id, songs)
                             }
                         },
                         onLongClick = if (!isMultiSelect) {
@@ -270,8 +271,8 @@ fun SongsPage(
                                     }
                                 }
                             } else {
-                                val useMetaCover = song.id == currentSongId && song.metaSources?.cover == null && song.tagsVersion < com.muses.player.core.media.scanner.WebDavLibraryScanner.TAGS_VERSION
-                                val displayCover = if (useMetaCover) currentMediaMetadata?.artworkUri?.toString() ?: song.coverUri else song.coverUri
+                                val useMetaCover = song.id == currentSongId && song.metaSources?.cover == null && song.tagsVersion < com.muses.player.core.data.db.SongTags.TAGS_VERSION
+                                val displayCover = if (useMetaCover) currentMeta?.coverUri ?: song.coverUri else song.coverUri
                                 if (displayCover != null) {
                                     SaltCover(
                                         uri = displayCover,
@@ -336,9 +337,9 @@ fun SongsPage(
                         // 开 shuffle 保证后续顺序也随机
                         val shuffleAll: () -> Unit = {
                             if (songs.isNotEmpty()) {
-                                playerConnection?.apply {
+                                playback?.apply {
                                     play(songs.random().id, songs)
-                                    setShuffleModeEnabled(true)
+                                    setShuffleEnabled(true)
                                 }
                             }
                         }
@@ -456,7 +457,7 @@ fun SongsPage(
             },
             onPlaySelected = {
                 val picked = songs.filter { it.id in selectedIds }
-                if (picked.isNotEmpty()) playerConnection?.play(picked.first().id, picked)
+                if (picked.isNotEmpty()) playback?.play(picked.first().id, picked)
                 exitMultiSelect()
             },
             onEnqueueScrape = {

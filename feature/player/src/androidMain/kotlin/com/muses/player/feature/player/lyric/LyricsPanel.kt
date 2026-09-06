@@ -316,7 +316,7 @@ private fun AppleMusicLyricsPanel(
         if (mediaId.isNullOrBlank()) return@LaunchedEffect
         isLoading = true
         errorMessage = null
-        runCatching { ProviderLyricsLoader.load(appContext, state) }
+        runCatching { ProviderLyricsLoader.load(state) }
             .onSuccess { lyrics = it }
             .onFailure { errorMessage = it.message ?: "歌词加载失败" }
         // A newly selected item always enters from its lyric start anchor.
@@ -1128,6 +1128,16 @@ private fun AppleMusicLyricsPanel(
             lines = lines,
             initialIndex = initial,
             onDismiss = { shareInitialIndex = null },
+            // U17：安卓系统分享面板（桌面装配传剪贴板）
+            onShareText = { text ->
+                val shareIntent = android.content.Intent.createChooser(
+                    android.content.Intent(android.content.Intent.ACTION_SEND)
+                        .setType("text/plain")
+                        .putExtra(android.content.Intent.EXTRA_TEXT, text),
+                    "分享歌词",
+                )
+                context.startActivity(shareIntent)
+            },
         )
     }
 }

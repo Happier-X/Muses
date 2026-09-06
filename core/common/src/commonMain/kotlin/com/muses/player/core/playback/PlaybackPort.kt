@@ -28,6 +28,14 @@ object PlaybackStates {
  * 队列展示字段（标题/艺术家）不进端口——端口只暴露 songId 有序集，
  * 由 VM 按曲库组合（双端同源 Room，见 QueueRow 组合链）。
  */
+/** 当前曲展示元数据（播放器实时标签；动态 ID3/刮削回写优先于文件标签的展示口径） */
+data class PlaybackMeta(
+    val title: String?,
+    val artist: String?,
+    val album: String?,
+    val coverUri: String?,
+)
+
 interface PlaybackPort : PlayerPort {
     // ── 读侧 ──
     val isPlaying: StateFlow<Boolean>
@@ -37,6 +45,9 @@ interface PlaybackPort : PlayerPort {
 
     /** 兜底封面（播放器实时 metadata 的 artworkUri；桌面暂空流） */
     val artworkUri: StateFlow<String?>
+
+    /** 当前曲实时展示元数据（安卓 Media3 metadata 直映；桌面暂空流） */
+    val currentMeta: StateFlow<PlaybackMeta?>
 
     val duration: StateFlow<Long>
 

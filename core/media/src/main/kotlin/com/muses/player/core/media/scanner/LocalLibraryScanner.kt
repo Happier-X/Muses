@@ -164,7 +164,7 @@ class LocalLibraryScanner constructor(
     )
 
     companion object {
-        const val TAGS_VERSION = 1
+        const val TAGS_VERSION = com.muses.player.core.data.db.SongTags.TAGS_VERSION
         /** 文件名/ MediaStore 占位建库的 tagsVersion（< TAGS_VERSION 即待播放懒扫描，对齐 WebDAV） */
         const val FILENAME_TAGS_VERSION = 0
 
