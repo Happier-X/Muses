@@ -25,6 +25,7 @@ import com.muses.player.core.scrape.ports.JaudiotaggerTagPort
 import com.muses.player.core.scrape.ports.TagPort
 import com.muses.player.core.scrape.queue.ScrapeHistoryStore
 import com.muses.player.core.scrape.queue.ScrapeQueueStore
+import com.muses.player.core.scrape.text.NegativeCache
 import com.muses.player.core.scrape.text.TextMetaMatcher
 import com.muses.player.core.scrape.writeback.AudioTagFileWriter
 import com.muses.player.core.scrape.writeback.HttpCoverBytesFetcher
@@ -133,6 +134,15 @@ internal object DesktopScrapeGraph {
     }
 
     private val tagPort: TagPort = JaudiotaggerTagPort
+
+    // U14：共享 ScrapeViewModel 的双 matcher（装配口径对齐安卓 ScrapeModule：文本五源 + 负缓存 / 封面默认六源）
+    val textMetaMatcher: TextMetaMatcher by lazy {
+        TextMetaMatcher(providers = TextMetaMatcher.defaultProviders(http), negativeCache = NegativeCache())
+    }
+
+    val coverMatcher: CoverMatcher by lazy {
+        CoverMatcher.withDefaultProviders(http)
+    }
 
     /** 桌面 WebDAV 客户端（写回上传/下载 + 未来浏览复用；限流与刮削共享同桶） */
     val webDavClient: DesktopWebDavClient by lazy {

@@ -17,6 +17,7 @@ import com.muses.player.desktop.di.DesktopCredentials
 import com.muses.player.core.webdav.webdavCoreModule
 import com.muses.player.feature.library.libraryModule
 import com.muses.player.feature.player.playerModule
+import com.muses.player.feature.scrape.scrapeFeatureModule
 import com.muses.player.feature.sources.sourcesCoreModule
 import org.koin.core.module.Module
 import org.koin.dsl.module
@@ -59,6 +60,15 @@ fun desktopLibraryModule(): Module = module {
     single<CredentialsRepository> { DesktopCredentials() }
     // WebDAV 链路日志（桌面无 CrashHandler 落盘链，环形缓冲即可）
     single<ErrorLogStore> { RingBufferErrorLogStore() }
+
+    // ── U14 刮削共享 VM 依赖（实例来自 DesktopScrapeGraph，引擎装配与安卓 ScrapeModule 同口径）──
+    single { com.muses.player.desktop.DesktopScrapeGraph.queueStore }
+    single { com.muses.player.desktop.DesktopScrapeGraph.textMetaMatcher }
+    single { com.muses.player.desktop.DesktopScrapeGraph.coverMatcher }
+    single { com.muses.player.desktop.DesktopScrapeGraph.orchestrator }
+    single { com.muses.player.desktop.DesktopScrapeGraph.editSearch }
+    // ScrapeReviewViewModel 构造首参（安卓由 Koin 导航参数供给，桌面无路由栈显式给空 handle）
+    single { androidx.lifecycle.SavedStateHandle() }
 }
 
 /** 桌面全量模块：共享 ViewModel 装配 + 桌面 DAO/Repository 接线。 */
@@ -66,6 +76,7 @@ val desktopAppModules: List<Module> = listOf(
     desktopLibraryModule(),
     libraryModule,
     playerModule,
+    scrapeFeatureModule,
     webdavCoreModule,
     sourcesCoreModule,
 )

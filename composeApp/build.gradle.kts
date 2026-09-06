@@ -29,6 +29,8 @@ kotlin {
             implementation(project(":feature:sources"))
             // U12 播放端口统一：desktopAppModules 装载 playerModule（共享 PlayerViewModel/端口绑定）
             implementation(project(":feature:player"))
+            // U14 刮削共用化：桌面复用共享 ScrapeScreen（手搓装配层删除）
+            implementation(project(":feature:scrape"))
             // 共享 ViewModel 经 Koin 注入（koinViewModel() 在 compose-viewmodel，KMP 工件；
             // KMP sourceSets 不支持 platform(BOM)，toml 已显式挂 4.2.0）
             implementation(libs.koin.core)

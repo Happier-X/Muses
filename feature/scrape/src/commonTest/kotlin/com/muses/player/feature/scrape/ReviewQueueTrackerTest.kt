@@ -1,8 +1,8 @@
 package com.muses.player.feature.scrape
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
-import org.junit.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.Test
 
 /**
  * S3 待审队列状态机单测（纯 JVM，无 Android 依赖）：
